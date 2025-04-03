@@ -1,6 +1,6 @@
 import voluptuous as vol
 from homeassistant import config_entries
-from pymodbus.client.tcp import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient
 import logging
 from .const import DOMAIN
 
@@ -42,7 +42,7 @@ class ThesslaGreenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def _test_connection(self, host, port):
         """Test połączenia z Modbus TCP."""
         try:
-            client = ModbusTcpClient(host, port)
+            client = ModbusTcpClient(host=host, port=port)
             connected = client.connect()
             if not connected:
                 _LOGGER.warning(f"Nie udało się połączyć z urządzeniem {host}:{port}")
