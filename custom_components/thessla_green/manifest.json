@@ -1,0 +1,10 @@
+{
+    "domain": "thessla_green",
+    "name": "Thessla Green",
+    "documentation": "https://github.com/aLAN-LDZ/ThesslaGreen_HA",
+    "dependencies": [],
+    "codeowners": ["@aLAN-LDZ"],
+    "requirements": ["pymodbus"],
+    "config_flow": true,
+    "version": "0.0.1"
+  }  
