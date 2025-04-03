@@ -1,0 +1,16 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "data": {
+                    "host": "Adres IP urządzenia",
+                    "port": "Port Modbus (domyślnie 502)"
+                },
+                "title": "Konfiguracja Thessla Green"
+            }
+        },
+        "error": {
+            "cannot_connect": "Nie można połączyć się z urządzeniem. Sprawdź adres IP i port."
+        }
+    }
+}
