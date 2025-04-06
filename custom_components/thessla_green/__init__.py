@@ -5,8 +5,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.components.http import StaticPathConfig
 import pathlib
 
-#DOMAIN = "thessla_green"
-#URL_BASE = "/thessla_green_frontend"
+from .const import DOMAIN, URL_BASE
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Setup z YAML (na razie nie używamy, bo robimy config w UI)."""

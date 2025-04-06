@@ -11,7 +11,7 @@
       "version": "0.0.1",
       "modules": [
         {
-          "url": "/custom_components/thessla_green/frontend/thessla_card.js",
+          "url": "/thessla_green_frontend/thessla_card.js",
           "type": "module"
         }
       ]
