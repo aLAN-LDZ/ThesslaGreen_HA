@@ -4,4 +4,10 @@ class ThesslaPictureCard extends HTMLElement {
   }
 
   set hass(hass) {}
+
+  getCardSize() {
+    return 1;
+  }
 }
+
+customElements.define("thessla-picture-card", ThesslaPictureCard);
