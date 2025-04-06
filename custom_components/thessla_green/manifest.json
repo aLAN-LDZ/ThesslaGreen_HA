@@ -8,7 +8,7 @@
     "config_flow": true,
     "version": "0.0.1",
     "frontend": {
-      "version": "1.0.0",
+      "version": "0.0.1",
       "modules": [
         {
           "url": "/custom_components/thessla_green/frontend/thessla_card.js",
