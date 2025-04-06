@@ -10,4 +10,5 @@ class ThesslaPictureCard extends HTMLElement {
   }
 }
 
+// ⬇️ TO JEST KLUCZOWE
 customElements.define("thessla-picture-card", ThesslaPictureCard);
