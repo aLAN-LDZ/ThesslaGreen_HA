@@ -22,6 +22,12 @@ class ThesslaGreenSensor(SensorEntity):
         self._attr_native_unit_of_measurement = unit
         self._attr_state_class = "measurement"
         self._attr_native_value = None
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, "thessla_green_device")},
+            name="Thessla Green",
+            manufacturer="Thessla",
+            model="Thessla Green Rekuperator",
+        )
 
     async def async_update(self):
         # Tu potem pobierzemy wartość z Modbusa – teraz robimy udawaną temperaturę
