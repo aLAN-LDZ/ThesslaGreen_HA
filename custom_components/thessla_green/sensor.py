@@ -7,6 +7,10 @@ from .const import DOMAIN
 
 import random
 
+import logging
+_LOGGER = logging.getLogger(__name__)
+
+
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     sensors = [
         ThesslaGreenSensor("Temperatura Czerpnia", "temp_czerpnia", TEMP_CELSIUS),
@@ -14,6 +18,8 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddE
         ThesslaGreenSensor("Temperatura Wywiew", "temp_wywiew", TEMP_CELSIUS),
     ]
     async_add_entities(sensors, update_before_add=True)
+    _LOGGER.warning("Ładowanie encji Thessla Green...")
+
 
 class ThesslaGreenSensor(SensorEntity):
     def __init__(self, name: str, unique_id: str, unit: str) -> None:
