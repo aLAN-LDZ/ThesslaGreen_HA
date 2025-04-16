@@ -1,5 +1,5 @@
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import TEMP_CELSIUS
+from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
@@ -13,9 +13,9 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities: AddEntitiesCallback) -> None:
     sensors = [
-        ThesslaGreenSensor("Temperatura Czerpnia", "temp_czerpnia", TEMP_CELSIUS),
-        ThesslaGreenSensor("Temperatura Nawiew", "temp_nawiew", TEMP_CELSIUS),
-        ThesslaGreenSensor("Temperatura Wywiew", "temp_wywiew", TEMP_CELSIUS),
+        ThesslaGreenSensor("Temperatura Czerpnia", "temp_czerpnia", UnitOfTemperature.CELSIUS),
+        ThesslaGreenSensor("Temperatura Nawiew", "temp_nawiew", UnitOfTemperature.CELSIUS),
+        ThesslaGreenSensor("Temperatura Wywiew", "temp_wywiew", UnitOfTemperature.CELSIUS),
     ]
     async_add_entities(sensors, update_before_add=True)
     _LOGGER.warning("Ładowanie encji Thessla Green...")
