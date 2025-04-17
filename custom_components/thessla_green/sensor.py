@@ -51,8 +51,8 @@ class ThesslaGreenSensor(SensorEntity):
 
     async def async_update(self):
         """Aktualizacja wartości sensora z rejestru Modbusa."""
-        result = await self._handler.read_input_register(self._address, input_type=self._input_type)
+        result = await self._handler.read_input_register(self._address)
         if result is not None:
-            self._state = result
+            self._value = result  # Wartość rejestru zostaje przypisana do _value
         else:
-            self._state = None
+            self._value = None  # Jeśli brak wyników, ustaw wartość na None
