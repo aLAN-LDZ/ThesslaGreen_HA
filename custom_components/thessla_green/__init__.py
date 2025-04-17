@@ -5,7 +5,7 @@ from homeassistant.helpers.typing import ConfigType
 from .modbus_handler import ThesslaModbusHandler
 from .const import DOMAIN
 
-PLATFORMS = ["sensor", "binary_sensor", "switch"]
+PLATFORMS = ["sensor"]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Setup z YAML (na razie nie używamy, bo robimy config w UI)."""
