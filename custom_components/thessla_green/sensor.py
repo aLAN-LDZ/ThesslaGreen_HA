@@ -13,7 +13,7 @@ SENSOR_DEFS = [
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
     """Konfiguracja sensorów dla wpisu w UI."""
-    handler = hass.data[DOMAIN]["handler"]
+    handler = hass.data[DOMAIN].get(entry.entry_id)
     
     # Tworzenie sensorów na podstawie definicji (tylko jeden sensor)
     sensors = [
