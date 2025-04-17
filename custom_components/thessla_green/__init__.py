@@ -34,6 +34,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Wyłączanie integracji."""
+    modbus_client = hass.data[DOMAIN].get(entry.entry_id, {}).get("client")
+    if modbus_client:
+        # Zakończenie połączenia Modbus
+        await modbus_client.client.close()
+    
     unload_ok = all([
         await hass.config_entries.async_forward_entry_unload(entry, platform)
         for platform in PLATFORMS
