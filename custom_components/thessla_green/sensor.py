@@ -6,15 +6,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
 from .const import DOMAIN
 
-# Definicje sensorów w jednym miejscu
 SENSOR_DEFS = [
     ("Temperatura Czerpnia", 16, "input", UnitOfTemperature.CELSIUS, 0.1, 1),
     ("Temperatura Nawiew", 17, "input", UnitOfTemperature.CELSIUS, 0.1, 1),
     ("Temperatura Wywiew", 18, "input", UnitOfTemperature.CELSIUS, 0.1, 1),
     ("Temperatura za FPX", 19, "input", UnitOfTemperature.CELSIUS, 0.1, 1),
     ("Temperatura PCB", 22, "input", UnitOfTemperature.CELSIUS, 0.1, 1),
-    ("Strumień nawiew", 256, "holding", UnitOfVolume.CUBIC_METERS_PER_HOUR, 1, 1),
-    ("Strumień wywiew", 257, "holding", UnitOfVolume.CUBIC_METERS_PER_HOUR, 1, 1),
+    ("Strumień nawiew", 256, "holding", "m³/h", 1, 1),
+    ("Strumień wywiew", 257, "holding", "m³/h", 1, 1),
     ("speedmanual", 4210, "holding", PERCENTAGE, 1, 1),
     # dodajemy pozostałe jako surowe liczby
     ("tryb pracy", 4208, "holding", None, 1, 0),
