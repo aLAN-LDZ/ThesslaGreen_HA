@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import timedelta
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant
@@ -32,9 +33,13 @@ async def async_setup_entry(
             client=client,
             slave=slave
         ) for sensor in BINARY_SENSORS
-    ])
+    ]
+
+    async_add_entities(entities, update_before_add=True)
 
 class ModbusBinarySensor(BinarySensorEntity):
+    _attr_should_poll = True
+
     def __init__(self, name: str, address: int, client, slave: int):
         self._attr_name = name
         self._address = address
@@ -43,14 +48,13 @@ class ModbusBinarySensor(BinarySensorEntity):
         self._attr_is_on = None
         self._attr_unique_id = f"thessla_bin_{slave}_{address}"
 
-    def update(self) -> None:
+    async def async_update(self) -> None:
         try:
             rr = self._client.read_discrete_inputs(address=self._address, count=1, slave=self._slave)
             if rr.isError():
                 _LOGGER.error(f"Modbus read error for {self._attr_name}: {rr}")
                 return
 
-            # Inwersja logiki (jeśli 0 = ON, 1 = OFF)
             self._attr_is_on = not rr.bits[0]
 
         except Exception as e:
