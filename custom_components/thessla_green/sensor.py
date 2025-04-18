@@ -1,58 +1,102 @@
-from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import UnitOfTemperature
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
-from .const import DOMAIN
+"""Platform for sensor integration."""
+from __future__ import annotations
 
-# Definicja tylko jednego sensora
-SENSOR_DEFS = [
-    ("Temperatura Czerpnia", 16, "input", UnitOfTemperature.CELSIUS, 0.1, 1),
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
+from homeassistant.const import UnitOfTemperature
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+
+from pymodbus.client.tcp import ModbusTcpClient
+from . import DOMAIN
+import logging
+
+_LOGGER = logging.getLogger(__name__)
+
+SENSORS = [
+    # Temperatura
+    {"name": "Rekuperator Temperatura Czerpnia", "address": 16, "input_type": "input", "scale": 0.1, "precision": 1, "unit": UnitOfTemperature.CELSIUS},
+    {"name": "Rekuperator Temperatura Nawiew", "address": 17, "input_type": "input", "scale": 0.1, "precision": 1, "unit": UnitOfTemperature.CELSIUS},
+    {"name": "Rekuperator Temperatura Wywiew", "address": 18, "input_type": "input", "scale": 0.1, "precision": 1, "unit": UnitOfTemperature.CELSIUS},
+    {"name": "Rekuperator Temperatura za FPX", "address": 19, "input_type": "input", "scale": 0.1, "precision": 1, "unit": UnitOfTemperature.CELSIUS},
+    {"name": "Rekuperator Temperatura PCB", "address": 22, "input_type": "input", "scale": 0.1, "precision": 1, "unit": UnitOfTemperature.CELSIUS},
+    # Przepływy
+    {"name": "Rekuperator Strumień nawiew", "address": 256, "input_type": "holding", "scale": 1, "precision": 1, "unit": "m3/h"},
+    {"name": "Rekuperator Strumień wywiew", "address": 257, "input_type": "holding", "scale": 1, "precision": 1, "unit": "m3/h"},
+    # Statusy i flagi
+    {"name": "Rekuperator lato zima", "address": 4209, "input_type": "holding"},
+    {"name": "Rekuperator Bypass", "address": 4320, "input_type": "holding"},
+    {"name": "Rekuperator tryb pracy", "address": 4208, "input_type": "holding"},
+    {"name": "Rekuperator speedmanual", "address": 4210, "input_type": "holding", "unit": "%"},
+    {"name": "Rekuperator fpx flaga", "address": 4192, "input_type": "holding"},
+    {"name": "Rekuperator FPX tryb", "address": 4198, "input_type": "holding"},
+    {"name": "Rekuperator Alarm", "address": 8192, "input_type": "holding"},
+    {"name": "Rekuperator Error", "address": 8193, "input_type": "holding"},
+    {"name": "Rekuperator FPX zabezpieczenie termiczne", "address": 8208, "input_type": "holding"},
+    {"name": "Rekuperator Awaria Wentylatora Nawiewu", "address": 8222, "input_type": "holding"},
+    {"name": "Rekuperator Awaria Wentylatora Wywiewu", "address": 8223, "input_type": "holding"},
+    {"name": "Rekuperator Awaria CF Nawiewu", "address": 8330, "input_type": "holding"},
+    {"name": "Rekuperator Awaria CF Wywiewu", "address": 8331, "input_type": "holding"},
+    {"name": "Rekuperator Wymiana Filtrów", "address": 8444, "input_type": "holding"},
 ]
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback):
-    """Konfiguracja sensorów dla wpisu w UI."""
-    handler = hass.data[DOMAIN].get(entry.entry_id)
-    
-    # Tworzenie sensorów na podstawie definicji (tylko jeden sensor)
-    sensors = [
-        ThesslaGreenSensor(name, address, input_type, unit, scale, precision, handler)
-        for name, address, input_type, unit, scale, precision in SENSOR_DEFS
-    ]
-    
-    # Dodanie sensorów do Home Assistant
-    async_add_entities(sensors)
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    data = hass.data[DOMAIN][entry.entry_id]
+    host = data["host"]
+    port = data["port"]
+    slave = data["slave"]
 
-class ThesslaGreenSensor(SensorEntity):
-    """Reprezentacja sensora do odczytu wartości z Modbusa."""
-    def __init__(self, name, address, input_type, unit, scale, precision, handler):
-        self._attr_name = f"Rekuperator {name}"
-        self._attr_unique_id = f"thessla_sensor_{address}"
-        self._attr_native_unit_of_measurement = unit
-        self._attr_state_class = "measurement"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, "thessla_green_device")},
-            name="Thessla Green",
-            manufacturer="Thessla",
-            model="Thessla Green Rekuperator",
-        )
-        self._handler = handler
+    async_add_entities([
+        ModbusGenericSensor(host=host, port=port, slave=slave, **sensor)
+        for sensor in SENSORS
+    ])
+
+
+
+class ModbusGenericSensor(SensorEntity):
+    """Representation of a Sensor."""
+
+    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, host="127.0.0.1", port=502, slave=1):
+        self._attr_name = name
         self._address = address
         self._input_type = input_type
         self._scale = scale
         self._precision = precision
-        self._value = None
+        self._unit = unit
+        self._slave = slave
+        self._attr_native_unit_of_measurement = unit
+        self._client = ModbusTcpClient(host, port=port, timeout=5)
+        self._attr_native_value = None
+        self._attr_unique_id = f"thessla_sensor_{slave}_{address}"
 
-    @property
-    def native_value(self):
-        """Zwraca wartość sensora."""
-        return self._value
+    def update(self) -> None:
+        try:
+            self._client.connect()
+            if self._input_type == "input":
+                rr = self._client.read_input_registers(address=self._address, count=1, slave=self._slave)
+            else:
+                rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
 
-    async def async_update(self):
-        """Aktualizacja wartości sensora z rejestru Modbusa."""
-        result = await self._handler.read_input_register(self._address)
-        if result is not None:
-            self._value = result  # Wartość rejestru zostaje przypisana do _value
-        else:
-            self._value = None  # Jeśli brak wyników, ustaw wartość na None
+            if rr.isError():
+                _LOGGER.error(f"Modbus read error for {self._attr_name}: {rr}")
+                return
+
+            raw_value = rr.registers[0]
+            if raw_value >= 0x8000:
+                raw_value -= 0x10000  # convert to signed int16
+
+            value = raw_value * self._scale
+            self._attr_native_value = round(value, self._precision)
+
+        except Exception as e:
+            _LOGGER.exception(f"Error reading Modbus data: {e}")
+        finally:
+            self._client.close()
