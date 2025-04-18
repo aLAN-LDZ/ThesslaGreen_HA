@@ -1,23 +1,14 @@
 """Platform for sensor integration."""
 from __future__ import annotations
+import logging
 
-from homeassistant.components.sensor import (
-    SensorDeviceClass,
-    SensorEntity,
-    SensorStateClass,
-)
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.config_entries import ConfigEntry
 
-from pymodbus.client.tcp import ModbusTcpClient
 from . import DOMAIN
-import logging
-
-from datetime import timedelta
-
-SCAN_INTERVAL = timedelta(seconds=10)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,13 +44,12 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    data = hass.data[DOMAIN][entry.entry_id]
-    host = data["host"]
-    port = data["port"]
-    slave = data["slave"]
+    modbus_data = hass.data[DOMAIN][entry.entry_id]
+    client = modbus_data["client"]
+    slave = modbus_data["slave"]
 
     async_add_entities([
-        ModbusGenericSensor(host=host, port=port, slave=slave, **sensor)
+        ModbusGenericSensor(client=client, slave=slave, **sensor)
         for sensor in SENSORS
     ])
 
@@ -68,7 +58,7 @@ async def async_setup_entry(
 class ModbusGenericSensor(SensorEntity):
     """Representation of a Sensor."""
 
-    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, host="127.0.0.1", port=502, slave=1):
+    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, client=None, slave=1):
         self._attr_name = name
         self._address = address
         self._input_type = input_type
@@ -77,13 +67,12 @@ class ModbusGenericSensor(SensorEntity):
         self._unit = unit
         self._slave = slave
         self._attr_native_unit_of_measurement = unit
-        self._client = ModbusTcpClient(host, port=port, timeout=5)
+        self._client = client
         self._attr_native_value = None
         self._attr_unique_id = f"thessla_sensor_{slave}_{address}"
 
     def update(self) -> None:
         try:
-            self._client.connect()
             if self._input_type == "input":
                 rr = self._client.read_input_registers(address=self._address, count=1, slave=self._slave)
             else:
@@ -102,5 +91,3 @@ class ModbusGenericSensor(SensorEntity):
 
         except Exception as e:
             _LOGGER.exception(f"Error reading Modbus data: {e}")
-        finally:
-            self._client.close()

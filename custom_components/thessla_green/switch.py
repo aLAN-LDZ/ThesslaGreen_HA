@@ -6,12 +6,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
-from pymodbus.client.tcp import ModbusTcpClient
 from . import DOMAIN
 
-from datetime import timedelta
-
-SCAN_INTERVAL = timedelta(seconds=10)
 _LOGGER = logging.getLogger(__name__)
 
 SWITCHES = [
@@ -26,10 +22,9 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback
 ) -> None:
-    data = hass.data[DOMAIN][entry.entry_id]
-    host = data["host"]
-    port = data["port"]
-    slave = data["slave"]
+    modbus_data = hass.data[DOMAIN][entry.entry_id]
+    client = modbus_data["client"]
+    slave = modbus_data["slave"]
 
     async_add_entities([
         ModbusSwitch(
@@ -38,15 +33,14 @@ async def async_setup_entry(
             command_on=sw["command_on"],
             command_off=sw["command_off"],
             verify=sw.get("verify", False),
-            host=host,
-            port=port,
+            client=client,
             slave=slave
         ) for sw in SWITCHES
     ])
 
 
 class ModbusSwitch(SwitchEntity):
-    def __init__(self, name, address, command_on, command_off, verify, host, port, slave):
+    def __init__(self, name, address, command_on, command_off, verify, client, slave):
         self._attr_name = name
         self._address = address
         self._command_on = command_on
@@ -54,12 +48,11 @@ class ModbusSwitch(SwitchEntity):
         self._verify = verify
         self._slave = slave
         self._attr_is_on = False
-        self._client = ModbusTcpClient(host, port=port, timeout=5)
+        self._client = client
         self._attr_unique_id = f"thessla_switch_{slave}_{self._address}"
 
     def turn_on(self, **kwargs):
         try:
-            self._client.connect()
             self._client.write_register(address=self._address, value=self._command_on, slave=self._slave)
             if self._verify:
                 self.update()
@@ -67,12 +60,9 @@ class ModbusSwitch(SwitchEntity):
                 self._attr_is_on = True
         except Exception as e:
             _LOGGER.exception(f"Error turning on {self._attr_name}: {e}")
-        finally:
-            self._client.close()
 
     def turn_off(self, **kwargs):
         try:
-            self._client.connect()
             self._client.write_register(address=self._address, value=self._command_off, slave=self._slave)
             if self._verify:
                 self.update()
@@ -80,14 +70,11 @@ class ModbusSwitch(SwitchEntity):
                 self._attr_is_on = False
         except Exception as e:
             _LOGGER.exception(f"Error turning off {self._attr_name}: {e}")
-        finally:
-            self._client.close()
 
     def update(self):
         if not self._verify:
             return
         try:
-            self._client.connect()
             rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
             if rr.isError():
                 _LOGGER.error(f"Modbus read error (verify) for {self._attr_name}: {rr}")
@@ -95,5 +82,3 @@ class ModbusSwitch(SwitchEntity):
             self._attr_is_on = (rr.registers[0] == self._command_on)
         except Exception as e:
             _LOGGER.exception(f"Error verifying {self._attr_name}: {e}")
-        finally:
-            self._client.close()
