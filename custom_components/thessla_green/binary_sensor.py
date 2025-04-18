@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-from datetime import timedelta
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant
@@ -26,37 +25,31 @@ async def async_setup_entry(
     client = modbus_data["client"]
     slave = modbus_data["slave"]
 
-    entities = [
-        ModbusBinarySensor(
-            name=sensor["name"],
-            address=sensor["address"],
-            client=client,
-            slave=slave,
-        ) for sensor in BINARY_SENSORS
-    ]
-
-    async_add_entities(entities, update_before_add=True)
+    async_add_entities([
+        ModbusBinarySensor(name=sensor["name"], address=sensor["address"], client=client, slave=slave)
+        for sensor in BINARY_SENSORS
+    ])
 
 class ModbusBinarySensor(BinarySensorEntity):
-    _attr_should_poll = True
+    """Representation of a binary Modbus sensor."""
 
-    def __init__(self, name: str, address: int, client, slave: int):
+    def __init__(self, name, address, client=None, slave=1):
         self._attr_name = name
         self._address = address
-        self._slave = slave
         self._client = client
+        self._slave = slave
         self._attr_is_on = None
-        self._attr_unique_id = f"thessla_bin_{slave}_{address}"
+        self._attr_unique_id = f"thessla_binary_sensor_{slave}_{address}"
 
-    async def async_update(self) -> None:
-        _LOGGER.info(f"Updating binary sensor: {self._attr_name}")
+    def update(self) -> None:
         try:
-            rr = self._client.read_discrete_inputs(address=self._address, count=1, slave=self._slave)
+            rr = self._client.read_coils(address=self._address, count=1, slave=self._slave)
+
             if rr.isError():
-                _LOGGER.error(f"Modbus read error for {self._attr_name}: {rr}")
+                _LOGGER.error(f"Modbus coil read error for {self._attr_name}: {rr}")
                 return
 
-            self._attr_is_on = not rr.bits[0]
+            self._attr_is_on = bool(rr.bits[0])
 
         except Exception as e:
-            _LOGGER.exception(f"Error reading binary sensor {self._attr_name}: {e}")
+            _LOGGER.exception(f"Error reading Modbus coil data: {e}")
