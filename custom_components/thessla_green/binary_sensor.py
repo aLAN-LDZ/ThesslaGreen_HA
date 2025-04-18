@@ -49,6 +49,7 @@ class ModbusBinarySensor(BinarySensorEntity):
         self._attr_unique_id = f"thessla_bin_{slave}_{address}"
 
     async def async_update(self) -> None:
+        _LOGGER.info(f"Updating binary sensor: {self._attr_name}")
         try:
             rr = self._client.read_discrete_inputs(address=self._address, count=1, slave=self._slave)
             if rr.isError():
