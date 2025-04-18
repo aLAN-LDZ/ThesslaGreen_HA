@@ -53,8 +53,6 @@ async def async_setup_entry(
         for sensor in SENSORS
     ])
 
-
-
 class ModbusGenericSensor(SensorEntity):
     """Representation of a Sensor."""
 
@@ -70,6 +68,13 @@ class ModbusGenericSensor(SensorEntity):
         self._client = client
         self._attr_native_value = None
         self._attr_unique_id = f"thessla_sensor_{slave}_{address}"
+
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{slave}")},
+            "name": "Rekuperator Thessla",
+            "manufacturer": "Thessla Green",
+            "model": "Modbus Rekuperator",
+        }
 
     def update(self) -> None:
         try:

@@ -41,6 +41,13 @@ class ModbusBinarySensor(BinarySensorEntity):
         self._attr_is_on = None
         self._attr_unique_id = f"thessla_binary_sensor_{slave}_{address}"
 
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{slave}")},
+            "name": "Rekuperator Thessla",
+            "manufacturer": "Thessla Green",
+            "model": "Modbus Rekuperator",
+        }
+
     def update(self) -> None:
         try:
             rr = self._client.read_coils(address=self._address, count=1, slave=self._slave)

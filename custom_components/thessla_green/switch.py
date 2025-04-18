@@ -51,6 +51,13 @@ class ModbusSwitch(SwitchEntity):
         self._client = client
         self._attr_unique_id = f"thessla_switch_{slave}_{self._address}"
 
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{slave}")},
+            "name": "Rekuperator Thessla",
+            "manufacturer": "Thessla Green",
+            "model": "Modbus Rekuperator",
+        }
+
     def turn_on(self, **kwargs):
         try:
             self._client.write_register(address=self._address, value=self._command_on, slave=self._slave)

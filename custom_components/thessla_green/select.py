@@ -43,6 +43,13 @@ class RekuperatorTrybSelect(SelectEntity):
         self._value_map = {v: k for k, v in MODES.items()}
         self._attr_unique_id = f"thessla_select_{slave}_{self._address}"
 
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{slave}")},
+            "name": "Rekuperator Thessla",
+            "manufacturer": "Thessla Green",
+            "model": "Modbus Rekuperator",
+        }
+
     def update(self):
         try:
             rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
