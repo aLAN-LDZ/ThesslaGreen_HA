@@ -15,6 +15,10 @@ from pymodbus.client.tcp import ModbusTcpClient
 from . import DOMAIN
 import logging
 
+from datetime import timedelta
+
+SCAN_INTERVAL = timedelta(seconds=10)
+
 _LOGGER = logging.getLogger(__name__)
 
 SENSORS = [

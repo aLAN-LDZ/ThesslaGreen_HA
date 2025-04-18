@@ -9,6 +9,10 @@ from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 from pymodbus.client.tcp import ModbusTcpClient
 from . import DOMAIN
 
+from datetime import timedelta
+
+SCAN_INTERVAL = timedelta(seconds=10)
+
 _LOGGER = logging.getLogger(__name__)
 
 MODES = {
