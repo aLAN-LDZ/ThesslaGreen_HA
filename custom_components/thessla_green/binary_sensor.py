@@ -26,12 +26,12 @@ async def async_setup_entry(
     client = modbus_data["client"]
     slave = modbus_data["slave"]
 
-    async_add_entities([
+    entities = [
         ModbusBinarySensor(
             name=sensor["name"],
             address=sensor["address"],
             client=client,
-            slave=slave
+            slave=slave,
         ) for sensor in BINARY_SENSORS
     ]
 
