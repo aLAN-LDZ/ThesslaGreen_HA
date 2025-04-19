@@ -7,8 +7,7 @@ import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "switch", "binary_sensor", "select"]
-
+PLATFORMS = ["sensor", "switch", "binary_sensor", "select", "number"]
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up from YAML (not used)."""
