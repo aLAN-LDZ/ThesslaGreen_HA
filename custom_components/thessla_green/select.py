@@ -18,6 +18,11 @@ MODES = {
     "Okna": 10,
 }
 
+SEASONS = {
+    "Lato": 0,
+    "Zima": 1,
+}
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -28,7 +33,8 @@ async def async_setup_entry(
     slave = modbus_data["slave"]
 
     async_add_entities([
-        RekuperatorTrybSelect(client=client, slave=slave)
+        RekuperatorTrybSelect(client=client, slave=slave),
+        RekuperatorSezonSelect(client=client, slave=slave),
     ])
 
 
@@ -75,3 +81,47 @@ class RekuperatorTrybSelect(SelectEntity):
 
         except Exception as e:
             _LOGGER.exception(f"Exception during tryb selection: {e}")
+
+class RekuperatorSezonSelect(SelectEntity):
+    def __init__(self, client, slave: int):
+        self._attr_name = "Rekuperator Sezon"
+        self._address = 4209
+        self._slave = slave
+        self._client = client
+        self._attr_options = list(SEASONS.keys())
+        self._attr_current_option = None
+        self._value_map = {v: k for k, v in SEASONS.items()}
+        self._attr_unique_id = f"thessla_sezon_select_{slave}_{self._address}"
+
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{slave}")},
+            "name": "Rekuperator Thessla",
+            "manufacturer": "Thessla Green",
+            "model": "Modbus Rekuperator",
+        }
+
+    def update(self):
+        try:
+            rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
+            if rr.isError():
+                _LOGGER.error(f"Error reading sezon rekuperatora: {rr}")
+                return
+
+            raw_value = rr.registers[0]
+            self._attr_current_option = self._value_map.get(raw_value)
+
+        except Exception as e:
+            _LOGGER.exception(f"Exception during sezon update: {e}")
+
+    def select_option(self, option: str) -> None:
+        try:
+            code = SEASONS.get(option)
+            if code is None:
+                _LOGGER.error(f"Unknown option selected: {option}")
+                return
+
+            self._client.write_register(address=self._address, value=code, slave=self._slave)
+            self._attr_current_option = option
+
+        except Exception as e:
+            _LOGGER.exception(f"Exception during sezon selection: {e}")
