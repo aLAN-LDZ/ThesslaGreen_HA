@@ -23,20 +23,8 @@ SENSORS = [
     {"name": "Rekuperator Strumień nawiew", "address": 256, "input_type": "holding", "scale": 1, "precision": 1, "unit": "m3/h", "icon": "mdi:fan"},
     {"name": "Rekuperator Strumień wywiew", "address": 257, "input_type": "holding", "scale": 1, "precision": 1, "unit": "m3/h", "icon": "mdi:fan"},
     # Statusy i flagi
-    #{"name": "Rekuperator lato zima", "address": 4209, "input_type": "holding", "icon": "mdi:snowflake"},
-    #{"name": "Rekuperator Bypass", "address": 4320, "input_type": "holding", "icon": "mdi:valve"},
     {"name": "Rekuperator tryb pracy", "address": 4208, "input_type": "holding", "icon": "mdi:cog"},
     {"name": "Rekuperator speedmanual", "address": 4210, "input_type": "holding", "unit": "%", "icon": "mdi:speedometer"},
-    #{"name": "Rekuperator fpx flaga", "address": 4192, "input_type": "holding", "icon": "mdi:flag"},
-    #{"name": "Rekuperator FPX tryb", "address": 4198, "input_type": "holding", "icon": "mdi:fan-alert"},
-    #{"name": "Rekuperator Alarm", "address": 8192, "input_type": "holding", "icon": "mdi:alarm-light"},
-    #{"name": "Rekuperator Error", "address": 8193, "input_type": "holding", "icon": "mdi:alert-circle"},
-    #{"name": "Rekuperator FPX zabezpieczenie termiczne", "address": 8208, "input_type": "holding", "icon": "mdi:thermometer-alert"},
-    #{"name": "Rekuperator Awaria Wentylatora Nawiewu", "address": 8222, "input_type": "holding", "icon": "mdi:fan-off"},
-    #{"name": "Rekuperator Awaria Wentylatora Wywiewu", "address": 8223, "input_type": "holding", "icon": "mdi:fan-off"},
-    #{"name": "Rekuperator Awaria CF Nawiewu", "address": 8330, "input_type": "holding", "icon": "mdi:fan-alert"},
-    #{"name": "Rekuperator Awaria CF Wywiewu", "address": 8331, "input_type": "holding", "icon": "mdi:fan-alert"},
-    #{"name": "Rekuperator Wymiana Filtrów", "address": 8444, "input_type": "holding", "icon": "mdi:air-filter"},
 ]
 
 async def async_setup_entry(
