@@ -41,7 +41,10 @@ class ModbusController:
 
         try:
             return func(*args, **kwargs)
-        except (BrokenPipeError, ConnectionResetError, ModbusIOException) as e:
+        except (BrokenPipeError, ConnectionResetError, ModbusIOException, OSError) as e:
+            if isinstance(e, OSError) and e.errno != errno.EBADF:
+                raise
+
             _LOGGER.warning(f"Connection lost or timeout: {e}. Reconnecting and retrying...")
             self._client.close()
             if self._client.connect():
