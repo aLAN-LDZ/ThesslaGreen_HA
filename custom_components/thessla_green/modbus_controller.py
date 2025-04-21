@@ -1,6 +1,6 @@
 from pymodbus.client.tcp import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
-from errno
+import errno
 
 import logging
 
