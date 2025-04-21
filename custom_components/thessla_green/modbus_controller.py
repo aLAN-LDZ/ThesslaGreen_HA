@@ -1,5 +1,6 @@
 from pymodbus.client.tcp import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
+import errno
 import logging
 
 _LOGGER = logging.getLogger(__name__)
