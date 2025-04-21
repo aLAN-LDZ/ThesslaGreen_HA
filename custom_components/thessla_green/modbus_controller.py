@@ -34,14 +34,14 @@ class ModbusController:
         return self._client
 
     def _safe_modbus_call(self, func, *args, **kwargs):
-        """Executes a Modbus function with automatic reconnection retry on broken pipe."""
+        """Executes a Modbus function with automatic reconnection retry on connection errors."""
         if not self.ensure_connected():
             return None
 
         try:
             return func(*args, **kwargs)
-        except (BrokenPipeError, ConnectionResetError) as e:
-            _LOGGER.warning(f"Connection lost: {e}. Reconnecting and retrying...")
+        except (BrokenPipeError, ConnectionResetError, ModbusIOException) as e:
+            _LOGGER.warning(f"Connection lost or timeout: {e}. Reconnecting and retrying...")
             self._client.close()
             if self._client.connect():
                 try:
