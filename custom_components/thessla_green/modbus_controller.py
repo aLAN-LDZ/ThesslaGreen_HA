@@ -19,11 +19,23 @@ class ModbusController:
     def close(self):
         self._client.close()
 
+    def ensure_connected(self) -> bool:
+        """Ensure the Modbus client is connected. Reconnect if needed."""
+        if not self._client.connected:
+            _LOGGER.warning(f"Modbus client disconnected from {self._host}:{self._port}, attempting reconnect...")
+            if not self._client.connect():
+                _LOGGER.error(f"Reconnection to Modbus server at {self._host}:{self._port} failed")
+                return False
+            _LOGGER.info(f"Successfully reconnected to Modbus server at {self._host}:{self._port}")
+        return True
+
     @property
     def client(self) -> ModbusTcpClient:
         return self._client
 
     def read_register(self, input_type: str, address: int, slave: int = 1) -> int | None:
+        if not self.ensure_connected():
+            return None
         try:
             if input_type == "input":
                 rr = self._client.read_input_registers(address=address, count=1, slave=slave)
@@ -44,6 +56,8 @@ class ModbusController:
             return None
 
     def write_register(self, address: int, value: int, slave: int = 1) -> bool:
+        if not self.ensure_connected():
+            return None
         try:
             rr = self._client.write_register(address=address, value=value, slave=slave)
             if rr.isError():
@@ -55,6 +69,8 @@ class ModbusController:
             return False
 
     def read_coil(self, address: int, slave: int = 1) -> bool | None:
+        if not self.ensure_connected():
+            return None
         try:
             rr = self._client.read_coils(address=address, count=1, slave=slave)
             if rr.isError():
@@ -66,6 +82,8 @@ class ModbusController:
             return None
 
     def read_holding(self, address: int, slave: int = 1) -> int | None:
+        if not self.ensure_connected():
+            return None
         try:
             rr = self._client.read_holding_registers(address=address, count=1, slave=slave)
             if rr.isError():
