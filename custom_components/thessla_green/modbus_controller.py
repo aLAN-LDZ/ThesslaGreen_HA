@@ -20,9 +20,9 @@ class ModbusController:
         self._client.close()
 
     def ensure_connected(self) -> bool:
-        """Ensure the Modbus client is connected. Reconnect if needed."""
         if not self._client.connected:
             _LOGGER.warning(f"Modbus client disconnected from {self._host}:{self._port}, attempting reconnect...")
+            self._client.close()
             if not self._client.connect():
                 _LOGGER.error(f"Reconnection to Modbus server at {self._host}:{self._port} failed")
                 return False
@@ -33,64 +33,71 @@ class ModbusController:
     def client(self) -> ModbusTcpClient:
         return self._client
 
-    def read_register(self, input_type: str, address: int, slave: int = 1) -> int | None:
+    def _safe_modbus_call(self, func, *args, **kwargs):
+        """Executes a Modbus function with automatic reconnection retry on broken pipe."""
         if not self.ensure_connected():
             return None
+
         try:
-            if input_type == "input":
-                rr = self._client.read_input_registers(address=address, count=1, slave=slave)
+            return func(*args, **kwargs)
+        except (BrokenPipeError, ConnectionResetError) as e:
+            _LOGGER.warning(f"Connection lost: {e}. Reconnecting and retrying...")
+            self._client.close()
+            if self._client.connect():
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e2:
+                    _LOGGER.exception(f"Retry failed after reconnect: {e2}")
             else:
-                rr = self._client.read_holding_registers(address=address, count=1, slave=slave)
-
-            if rr.isError():
-                _LOGGER.error(f"Modbus read error (type={input_type}) at address {address}")
-                return None
-
-            value = rr.registers[0]
-            if value >= 0x8000:
-                value -= 0x10000  # signed int16
-            return value
-
+                _LOGGER.error("Reconnect failed.")
         except Exception as e:
-            _LOGGER.exception(f"Exception while reading Modbus register: {e}")
+            _LOGGER.exception(f"Unexpected exception during Modbus operation: {e}")
+        return None
+
+    def read_register(self, input_type: str, address: int, slave: int = 1) -> int | None:
+        def read():
+            if input_type == "input":
+                return self._client.read_input_registers(address=address, count=1, slave=slave)
+            return self._client.read_holding_registers(address=address, count=1, slave=slave)
+
+        rr = self._safe_modbus_call(read)
+        if rr is None or rr.isError():
+            _LOGGER.error(f"Modbus read error (type={input_type}) at address {address}")
             return None
 
-    def write_register(self, address: int, value: int, slave: int = 1) -> bool:
-        if not self.ensure_connected():
-            return None
-        try:
-            rr = self._client.write_register(address=address, value=value, slave=slave)
-            if rr.isError():
-                _LOGGER.error(f"Modbus write error at address {address} with value {value}")
-                return False
-            return True
-        except Exception as e:
-            _LOGGER.exception(f"Exception while writing Modbus register: {e}")
-            return False
-
-    def read_coil(self, address: int, slave: int = 1) -> bool | None:
-        if not self.ensure_connected():
-            return None
-        try:
-            rr = self._client.read_coils(address=address, count=1, slave=slave)
-            if rr.isError():
-                _LOGGER.error(f"Modbus coil read error at address {address}")
-                return None
-            return bool(rr.bits[0])
-        except Exception as e:
-            _LOGGER.exception(f"Exception while reading coil at {address}: {e}")
-            return None
+        value = rr.registers[0]
+        return value - 0x10000 if value >= 0x8000 else value
 
     def read_holding(self, address: int, slave: int = 1) -> int | None:
-        if not self.ensure_connected():
+        def read():
+            return self._client.read_holding_registers(address=address, count=1, slave=slave)
+
+        rr = self._safe_modbus_call(read)
+        if rr is None or rr.isError():
+            _LOGGER.error(f"Modbus holding register read error at address {address}")
             return None
-        try:
-            rr = self._client.read_holding_registers(address=address, count=1, slave=slave)
-            if rr.isError():
-                _LOGGER.error(f"Modbus holding register read error at address {address}")
-                return None
-            value = rr.registers[0]
-            return value - 0x10000 if value >= 0x8000 else value
-        except Exception as e:
-            _LOGGER.exception(f"Exception while reading holding register at {address}: {e}")
+
+        value = rr.registers[0]
+        return value - 0x10000 if value >= 0x8000 else value
+
+    def read_coil(self, address: int, slave: int = 1) -> bool | None:
+        def read():
+            return self._client.read_coils(address=address, count=1, slave=slave)
+
+        rr = self._safe_modbus_call(read)
+        if rr is None or rr.isError():
+            _LOGGER.error(f"Modbus coil read error at address {address}")
             return None
+
+        return bool(rr.bits[0])
+
+    def write_register(self, address: int, value: int, slave: int = 1) -> bool:
+        def write():
+            return self._client.write_register(address=address, value=value, slave=slave)
+
+        rr = self._safe_modbus_call(write)
+        if rr is None or rr.isError():
+            _LOGGER.error(f"Modbus write error at address {address} with value {value}")
+            return False
+
+        return True
