@@ -7,5 +7,5 @@
   "documentation": "https://github.com/aLAN-LDZ/ThesslaGreen_HA",
   "iot_class": "local_polling",
   "requirements": ["pymodbus"],
-  "version": "0.0.1"
+  "version": "0.0.6"
 }
