@@ -1,6 +1,7 @@
 from pymodbus.client.tcp import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
-import errno
+from errno import EPIPE, ECONNRESET, EBADF
+
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,8 +43,9 @@ class ModbusController:
 
         try:
             return func(*args, **kwargs)
+
         except (BrokenPipeError, ConnectionResetError, ModbusIOException, OSError) as e:
-            if isinstance(e, OSError) and e.errno != errno.EBADF:
+            if isinstance(e, OSError) and e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.EBADF):
                 raise
 
             _LOGGER.warning(f"Connection lost or timeout: {e}. Reconnecting and retrying...")
@@ -55,8 +57,10 @@ class ModbusController:
                     _LOGGER.exception(f"Retry failed after reconnect: {e2}")
             else:
                 _LOGGER.error("Reconnect failed.")
+
         except Exception as e:
             _LOGGER.exception(f"Unexpected exception during Modbus operation: {e}")
+
         return None
 
     def read_register(self, input_type: str, address: int, slave: int = 1) -> int | None:
