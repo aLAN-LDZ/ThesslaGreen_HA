@@ -8,6 +8,7 @@ from homeassistant.helpers.typing import ConfigType
 from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
+from .modbus_controller import ModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -18,20 +19,21 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    client = modbus_data["client"]
+    controller: ModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
-        RekuperatorPredkoscNumber(client=client, slave=slave)
+        RekuperatorPredkoscNumber(controller=controller, slave=slave)
     ])
 
 
+
 class RekuperatorPredkoscNumber(NumberEntity):
-    def __init__(self, client, slave: int):
+    def __init__(self, controller: ModbusController, slave: int):
         self._attr_name = "Rekuperator Prędkość"
         self._address = 4210
         self._slave = slave
-        self._client = client
+        self._controller = controller
         self._attr_native_unit_of_measurement = "%"
         self._attr_native_min_value = 0
         self._attr_native_max_value = 100
@@ -48,20 +50,16 @@ class RekuperatorPredkoscNumber(NumberEntity):
 
     def update(self):
         try:
-            rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
-            if rr.isError():
-                _LOGGER.error(f"Error reading prędkość rekuperatora: {rr}")
-                return
-
-            self._attr_native_value = rr.registers[0]
-
+            value = self._controller.read_register("holding", self._address, self._slave)
+            if value is not None:
+                self._attr_native_value = value
         except Exception as e:
             _LOGGER.exception(f"Exception during prędkość update: {e}")
 
     def set_native_value(self, value: float) -> None:
         try:
-            self._client.write_register(address=self._address, value=int(value), slave=self._slave)
-            self._attr_native_value = value
-
+            success = self._controller.write_register(self._address, int(value), self._slave)
+            if success:
+                self._attr_native_value = value
         except Exception as e:
             _LOGGER.exception(f"Exception during prędkość set: {e}")

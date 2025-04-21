@@ -3,6 +3,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 from pymodbus.client.tcp import ModbusTcpClient
 from .const import DOMAIN
+from .modbus_controller import ModbusController
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -19,14 +20,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     port = entry.data["port"]
     slave = entry.data["slave"]
 
-    # Tworzenie klienta Modbus i zapisanie w hass.data
-    client = ModbusTcpClient(host=host, port=port, timeout=5)
-    if not client.connect():
+    controller = ModbusController(host=host, port=port)
+    if not controller.connect():
         _LOGGER.error("Cannot connect to Modbus server.")
         return False
 
     hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
+        "controller": controller,
         "slave": slave,
     }
 
@@ -43,9 +43,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for platform in PLATFORMS
     )
 
-    # Zamykanie połączenia Modbus
-    client = hass.data[DOMAIN][entry.entry_id]["client"]
-    client.close()
+    controller: ModbusController = hass.data[DOMAIN][entry.entry_id]["controller"]
+    controller.close()
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
