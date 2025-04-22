@@ -1,7 +1,7 @@
 from pymodbus.client.tcp import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
+import time
 import errno
-
 import logging
 
 _LOGGER = logging.getLogger(__name__)
@@ -12,6 +12,8 @@ class ModbusController:
         self._client = ModbusTcpClient(host=host, port=port, timeout=timeout)
         self._host = host
         self._port = port
+        self._last_read_time = {}  # (type, address, slave): timestamp
+        self._throttle_ttl = 30.0   # sekundy – minimalny odstęp czasu między odczytami
 
     def connect(self) -> bool:
         if not self._client.connect():
@@ -26,6 +28,7 @@ class ModbusController:
         if not self._client.connected:
             _LOGGER.warning(f"Modbus client disconnected from {self._host}:{self._port}, attempting reconnect...")
             self._client.close()
+            self._client = ModbusTcpClient(host=self._host, port=self._port)  # odtwórz klienta na nowo
             if not self._client.connect():
                 _LOGGER.error(f"Reconnection to Modbus server at {self._host}:{self._port} failed")
                 return False
@@ -35,6 +38,14 @@ class ModbusController:
     @property
     def client(self) -> ModbusTcpClient:
         return self._client
+
+    def _throttled(self, key: tuple) -> bool:
+        now = time.time()
+        last_time = self._last_read_time.get(key, 0)
+        if now - last_time < self._throttle_ttl:
+            return True
+        self._last_read_time[key] = now
+        return False
 
     def _safe_modbus_call(self, func, *args, **kwargs):
         """Executes a Modbus function with automatic reconnection retry on connection errors."""
@@ -50,6 +61,7 @@ class ModbusController:
 
             _LOGGER.warning(f"Connection lost or timeout: {e}. Reconnecting and retrying...")
             self._client.close()
+            self._client = ModbusTcpClient(host=self._host, port=self._port)
             if self._client.connect():
                 try:
                     return func(*args, **kwargs)
@@ -64,6 +76,10 @@ class ModbusController:
         return None
 
     def read_register(self, input_type: str, address: int, slave: int = 1) -> int | None:
+        key = (input_type, address, slave)
+        if self._throttled(key):
+            return None
+
         def read():
             if input_type == "input":
                 return self._client.read_input_registers(address=address, count=1, slave=slave)
@@ -78,6 +94,10 @@ class ModbusController:
         return value - 0x10000 if value >= 0x8000 else value
 
     def read_holding(self, address: int, slave: int = 1) -> int | None:
+        key = ("holding", address, slave)
+        if self._throttled(key):
+            return None
+
         def read():
             return self._client.read_holding_registers(address=address, count=1, slave=slave)
 
