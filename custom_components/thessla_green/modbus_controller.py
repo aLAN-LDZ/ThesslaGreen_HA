@@ -13,7 +13,7 @@ class ModbusController:
         self._host = host
         self._port = port
         self._last_read_time = {}  # (type, address, slave): timestamp
-        self._throttle_ttl = 30.0   # sekundy – minimalny odstęp czasu między odczytami
+        self._throttle_ttl = 15.0   # sekundy – minimalny odstęp czasu między odczytami
 
     def connect(self) -> bool:
         if not self._client.connect():
