@@ -53,7 +53,7 @@ class ThesslaGreenModbusController:
                 test = self._client.read_holding_registers(address=4387, count=1, slave=self._slave)
                 if test and not test.isError():
                     if not was_connected:
-                        _LOGGER.info("Modbus reconnected successfully.")
+                        _LOGGER.warning("Modbus reconnected successfully.")
                     self._connected = True
                     self._log_suppressed = False
                     return True
@@ -89,7 +89,7 @@ class ThesslaGreenModbusController:
                 if await self._ensure_connected():
                     self._disabled = False
                     self._error_count = 0
-                    _LOGGER.info("Modbus reconnected successfully. Resuming normal operation.")
+                    _LOGGER.warning("Modbus reconnected successfully. Resuming normal operation.")
                 else:
                     await asyncio.sleep(retry_interval)
                 continue
