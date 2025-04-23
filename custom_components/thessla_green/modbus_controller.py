@@ -1,5 +1,4 @@
 from pymodbus.client import ModbusTcpClient
-from pymodbus.exceptions import ModbusIOException
 import asyncio
 import logging
 
@@ -39,9 +38,11 @@ class ThesslaGreenModbusController:
         self._client.close()
 
     async def _ensure_connected(self) -> bool:
+        if self._disabled:
+            return False
         if self._client.connect():
             self._connected = True
-            self._log_suppressed = False  # reset suppress
+            self._log_suppressed = False
             return True
         else:
             self._connected = False
@@ -105,9 +106,9 @@ class ThesslaGreenModbusController:
 
     async def read_holding(self, address):
         async with self._lock:
-            if not self._connected:
+            if self._disabled or not self._connected:
                 if not self._log_suppressed:
-                    _LOGGER.warning("Modbus client not connected, skipping read_holding")
+                    _LOGGER.warning("Modbus offline, skipping read_holding")
                     self._log_suppressed = True
                 return None
             self._log_suppressed = False
@@ -115,20 +116,19 @@ class ThesslaGreenModbusController:
 
     async def read_input(self, address):
         async with self._lock:
-            if not self._connected:
+            if self._disabled or not self._connected:
                 if not self._log_suppressed:
-                    _LOGGER.warning("Modbus client not connected, skipping read_input")
+                    _LOGGER.warning("Modbus offline, skipping read_input")
                     self._log_suppressed = True
                 return None
             self._log_suppressed = False
             return self._data_input.get(address)
 
-
     async def write_register(self, address: int, value: int) -> bool:
         async with self._lock:
-            if not await self._ensure_connected():
+            if self._disabled or not self._connected:
                 if not self._log_suppressed:
-                    _LOGGER.error("Could not connect to Modbus server for writing")
+                    _LOGGER.error("Modbus offline, skipping write_register")
                     self._log_suppressed = True
                 return False
             self._log_suppressed = False
@@ -144,9 +144,9 @@ class ThesslaGreenModbusController:
 
     async def read_coil(self, address):
         async with self._lock:
-            if not await self._ensure_connected():
+            if self._disabled or not self._connected:
                 if not self._log_suppressed:
-                    _LOGGER.error("Could not connect to Modbus server for coil read")
+                    _LOGGER.error("Modbus offline, skipping read_coil")
                     self._log_suppressed = True
                 return None
             self._log_suppressed = False
