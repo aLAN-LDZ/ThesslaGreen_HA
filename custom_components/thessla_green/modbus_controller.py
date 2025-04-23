@@ -17,6 +17,14 @@ class ThesslaGreenModbusController:
         self._lock = asyncio.Lock()
         self._task = None
 
+        # Zakresy na podstawie używanych encji
+        self._holding_blocks = [
+            (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
+            (4224, 1), (4320, 1), (4387, 1),
+            (8192, 2), (8208, 1), (8222, 2), (8330, 2), (8444, 1)
+        ]
+        self._input_blocks = [(16, 4), (22, 1)]
+
     async def start(self):
         self._task = asyncio.create_task(self._scheduler())
 
@@ -40,23 +48,21 @@ class ThesslaGreenModbusController:
                 return
 
             try:
-                # Read holding registers in blocks
-                for start in [0, 16, 32, 48]:
-                    rr = self._client.read_holding_registers(address=start, count=16, slave=self._slave)
+                for start, count in self._holding_blocks:
+                    rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
                     if not rr.isError():
                         for i, val in enumerate(rr.registers):
                             self._data_holding[start + i] = val
                     else:
-                        _LOGGER.warning("Error reading holding registers %s-%s", start, start + 15)
+                        _LOGGER.warning("Error reading holding registers %s-%s", start, start + count - 1)
 
-                # Read input registers in blocks
-                for start in [0, 16]:
-                    rr = self._client.read_input_registers(address=start, count=16, slave=self._slave)
+                for start, count in self._input_blocks:
+                    rr = self._client.read_input_registers(address=start, count=count, slave=self._slave)
                     if not rr.isError():
                         for i, val in enumerate(rr.registers):
                             self._data_input[start + i] = val
                     else:
-                        _LOGGER.warning("Error reading input registers %s-%s", start, start + 15)
+                        _LOGGER.warning("Error reading input registers %s-%s", start, start + count - 1)
 
             except ModbusIOException as e:
                 _LOGGER.error("Modbus read failed: %s", e)
