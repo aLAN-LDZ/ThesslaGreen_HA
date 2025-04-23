@@ -17,7 +17,10 @@ class ThesslaGreenModbusController:
         self._lock = asyncio.Lock()
         self._task = None
 
-        # Zakresy na podstawie używanych encji
+        self._error_count = 0
+        self._max_errors = 5
+        self._disabled = False
+
         self._holding_blocks = [
             (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
             (4224, 1), (4320, 1), (4387, 1),
@@ -35,37 +38,48 @@ class ThesslaGreenModbusController:
 
     async def _scheduler(self):
         while True:
+            if self._disabled:
+                _LOGGER.error("Modbus polling disabled after %d consecutive errors", self._max_errors)
+                return
+
             try:
                 await self._update_all()
+                self._error_count = 0  # reset po sukcesie
             except Exception as e:
-                _LOGGER.error("Scheduler error: %s", e)
+                self._error_count += 1
+                _LOGGER.error("Scheduler error (%d/%d): %s", self._error_count, self._max_errors, e)
+
+                # Zamknij i spróbuj ponownie połączenie
+                self._client.close()
+                await asyncio.sleep(2)
+                self._client = ModbusTcpClient(host=self._host, port=self._port)
+
+                if self._error_count >= self._max_errors:
+                    self._disabled = True
+                    _LOGGER.error("Too many Modbus errors. Stopping further attempts.")
+
             await asyncio.sleep(self._update_interval)
 
     async def _update_all(self):
         async with self._lock:
             if not self._client.connect():
-                _LOGGER.error("Could not connect to Modbus server at %s:%s", self._host, self._port)
-                return
+                raise ConnectionError(f"Could not connect to Modbus server at {self._host}:{self._port}")
 
-            try:
-                for start, count in self._holding_blocks:
-                    rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
-                    if not rr.isError():
-                        for i, val in enumerate(rr.registers):
-                            self._data_holding[start + i] = val
-                    else:
-                        _LOGGER.warning("Error reading holding registers %s-%s", start, start + count - 1)
+            for start, count in self._holding_blocks:
+                rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
+                if not rr.isError():
+                    for i, val in enumerate(rr.registers):
+                        self._data_holding[start + i] = val
+                else:
+                    _LOGGER.warning("Error reading holding registers %s-%s", start, start + count - 1)
 
-                for start, count in self._input_blocks:
-                    rr = self._client.read_input_registers(address=start, count=count, slave=self._slave)
-                    if not rr.isError():
-                        for i, val in enumerate(rr.registers):
-                            self._data_input[start + i] = val
-                    else:
-                        _LOGGER.warning("Error reading input registers %s-%s", start, start + count - 1)
-
-            except ModbusIOException as e:
-                _LOGGER.error("Modbus read failed: %s", e)
+            for start, count in self._input_blocks:
+                rr = self._client.read_input_registers(address=start, count=count, slave=self._slave)
+                if not rr.isError():
+                    for i, val in enumerate(rr.registers):
+                        self._data_input[start + i] = val
+                else:
+                    _LOGGER.warning("Error reading input registers %s-%s", start, start + count - 1)
 
     async def read_holding(self, address):
         async with self._lock:
