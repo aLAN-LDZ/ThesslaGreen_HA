@@ -51,7 +51,10 @@ class ThesslaGreenModbusController:
             if not was_connected:
                 _LOGGER.info("Modbus reconnected successfully.")
             return True
-        return False
+        else:
+            self._client.close()
+            self._client = ModbusTcpClient(host=self._host, port=self._port)
+            return False
 
     async def _scheduler(self):
         retry_interval = 60
