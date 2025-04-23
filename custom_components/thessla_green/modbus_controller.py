@@ -20,6 +20,7 @@ class ThesslaGreenModbusController:
         self._error_count = 0
         self._max_errors = 5
         self._disabled = False
+        self._connected = False
 
         self._holding_blocks = [
             (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
@@ -36,6 +37,14 @@ class ThesslaGreenModbusController:
             self._task.cancel()
         self._client.close()
 
+    async def _ensure_connected(self) -> bool:
+        if self._client.connect():
+            self._connected = True
+            return True
+        else:
+            self._connected = False
+            return False
+
     async def _scheduler(self):
         while True:
             if self._disabled:
@@ -43,13 +52,19 @@ class ThesslaGreenModbusController:
                 return
 
             try:
+                if not await self._ensure_connected():
+                    _LOGGER.warning("Unable to connect to Modbus. Retrying in 30s.")
+                    await asyncio.sleep(30)
+                    continue
+
                 await self._update_all()
-                self._error_count = 0  # reset po sukcesie
+                self._error_count = 0  # reset after success
+
             except Exception as e:
                 self._error_count += 1
                 _LOGGER.error("Scheduler error (%d/%d): %s", self._error_count, self._max_errors, e)
 
-                # Zamknij i spróbuj ponownie połączenie
+                # Reconnect attempt
                 self._client.close()
                 await asyncio.sleep(2)
                 self._client = ModbusTcpClient(host=self._host, port=self._port)
@@ -62,7 +77,7 @@ class ThesslaGreenModbusController:
 
     async def _update_all(self):
         async with self._lock:
-            if not self._client.connect():
+            if not await self._ensure_connected():
                 raise ConnectionError(f"Could not connect to Modbus server at {self._host}:{self._port}")
 
             for start, count in self._holding_blocks:
@@ -83,15 +98,21 @@ class ThesslaGreenModbusController:
 
     async def read_holding(self, address):
         async with self._lock:
+            if not self._connected:
+                _LOGGER.warning("Modbus client not connected, skipping read_holding")
+                return None
             return self._data_holding.get(address)
 
     async def read_input(self, address):
         async with self._lock:
+            if not self._connected:
+                _LOGGER.warning("Modbus client not connected, skipping read_input")
+                return None
             return self._data_input.get(address)
 
     async def write_register(self, address: int, value: int) -> bool:
         async with self._lock:
-            if not self._client.connect():
+            if not await self._ensure_connected():
                 _LOGGER.error("Could not connect to Modbus server for writing")
                 return False
             try:
@@ -106,7 +127,7 @@ class ThesslaGreenModbusController:
 
     async def read_coil(self, address):
         async with self._lock:
-            if not self._client.connect():
+            if not await self._ensure_connected():
                 _LOGGER.error("Could not connect to Modbus server for coil read")
                 return None
             try:
