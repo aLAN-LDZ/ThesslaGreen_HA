@@ -35,6 +35,10 @@ class ThesslaGreenModbusController:
     async def stop(self):
         if self._task:
             self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
         self._client.close()
 
     async def _ensure_connected(self) -> bool:
@@ -46,7 +50,6 @@ class ThesslaGreenModbusController:
 
         if connected:
             try:
-                # TEST: odczyt rejestru 4387 (Rekuperator ON/OFF)
                 test = self._client.read_holding_registers(address=4387, count=1, slave=self._slave)
                 if test and not test.isError():
                     if not was_connected:
@@ -58,6 +61,18 @@ class ThesslaGreenModbusController:
                     _LOGGER.debug("Modbus connect OK, but test read of register 4387 failed.")
             except Exception as e:
                 _LOGGER.debug("Modbus test read of register 4387 raised exception: %s", e)
+
+        # Połączenie nie działa – pełny reset klienta z opóźnieniem
+        _LOGGER.warning("Modbus connection failed. Resetting Modbus client...")
+        self._connected = False
+        try:
+            self._client.close()
+        except Exception as e:
+            _LOGGER.debug("Exception while closing client: %s", e)
+
+        await asyncio.sleep(1)  # Daj czas na zamknięcie socketu
+        self._client = ModbusTcpClient(host=self._host, port=self._port)
+        return False
 
         # Połączenie nie działa – reset klienta
         self._connected = False
