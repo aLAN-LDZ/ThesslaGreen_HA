@@ -37,19 +37,21 @@ class ThesslaGreenModbusController:
             self._task.cancel()
         self._client.close()
 
-    def _try_connect(self) -> bool:
-        # tylko sync, bez wywoływania w async metodach jak read_coil()
-        try:
-            if self._client.connect():
-                self._connected = True
-                self._log_suppressed = False
-                return True
-            else:
-                self._connected = False
-                return False
-        except Exception:
-            self._connected = False
+    async def _ensure_connected(self) -> bool:
+        if self._disabled:
             return False
+
+        was_connected = self._connected
+        connected = self._client.connect()
+
+        self._connected = connected
+
+        if connected:
+            self._log_suppressed = False
+            if not was_connected:
+                _LOGGER.info("Modbus reconnected successfully.")
+            return True
+        return False
 
     async def _scheduler(self):
         retry_interval = 60
@@ -57,7 +59,7 @@ class ThesslaGreenModbusController:
         while True:
             if self._disabled:
                 _LOGGER.warning("Modbus polling is disabled. Trying to reconnect in %ds...", retry_interval)
-                if self._try_connect():
+                if await self._ensure_connected():
                     self._disabled = False
                     self._error_count = 0
                     _LOGGER.info("Modbus reconnected successfully. Resuming normal operation.")
@@ -66,7 +68,7 @@ class ThesslaGreenModbusController:
                 continue
 
             try:
-                if not self._try_connect():
+                if not await self._ensure_connected():
                     raise ConnectionError("Initial connect failed")
 
                 await self._update_all()
@@ -88,8 +90,8 @@ class ThesslaGreenModbusController:
 
     async def _update_all(self):
         async with self._lock:
-            if not self._connected:
-                raise ConnectionError(f"Not connected to Modbus server at {self._host}:{self._port}")
+            if not await self._ensure_connected():
+                raise ConnectionError(f"Could not connect to Modbus server at {self._host}:{self._port}")
 
             for start, count in self._holding_blocks:
                 rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
