@@ -21,6 +21,7 @@ class ThesslaGreenModbusController:
         self._max_errors = 5
         self._disabled = False
         self._connected = False
+        self._log_suppressed = False
 
         self._holding_blocks = [
             (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
@@ -40,38 +41,44 @@ class ThesslaGreenModbusController:
     async def _ensure_connected(self) -> bool:
         if self._client.connect():
             self._connected = True
+            self._log_suppressed = False  # reset suppress
             return True
         else:
             self._connected = False
             return False
 
     async def _scheduler(self):
+        retry_interval = 60
+
         while True:
             if self._disabled:
-                _LOGGER.error("Modbus polling disabled after %d consecutive errors", self._max_errors)
-                return
+                _LOGGER.warning("Modbus polling is disabled. Trying to reconnect in %ds...", retry_interval)
+                if await self._ensure_connected():
+                    self._disabled = False
+                    self._error_count = 0
+                    _LOGGER.info("Modbus reconnected successfully. Resuming normal operation.")
+                else:
+                    await asyncio.sleep(retry_interval)
+                continue
 
             try:
                 if not await self._ensure_connected():
-                    _LOGGER.warning("Unable to connect to Modbus. Retrying in 30s.")
-                    await asyncio.sleep(30)
-                    continue
+                    raise ConnectionError("Initial connect failed")
 
                 await self._update_all()
-                self._error_count = 0  # reset after success
+                self._error_count = 0
 
             except Exception as e:
                 self._error_count += 1
-                _LOGGER.error("Scheduler error (%d/%d): %s", self._error_count, self._max_errors, e)
+                _LOGGER.debug("Scheduler error (%d/%d): %s", self._error_count, self._max_errors, e)
 
-                # Reconnect attempt
                 self._client.close()
                 await asyncio.sleep(2)
                 self._client = ModbusTcpClient(host=self._host, port=self._port)
 
                 if self._error_count >= self._max_errors:
                     self._disabled = True
-                    _LOGGER.error("Too many Modbus errors. Stopping further attempts.")
+                    _LOGGER.warning("Too many Modbus errors (%d). Going offline.", self._error_count)
 
             await asyncio.sleep(self._update_interval)
 
@@ -99,22 +106,32 @@ class ThesslaGreenModbusController:
     async def read_holding(self, address):
         async with self._lock:
             if not self._connected:
-                _LOGGER.warning("Modbus client not connected, skipping read_holding")
+                if not self._log_suppressed:
+                    _LOGGER.warning("Modbus client not connected, skipping read_holding")
+                    self._log_suppressed = True
                 return None
+            self._log_suppressed = False
             return self._data_holding.get(address)
 
     async def read_input(self, address):
         async with self._lock:
             if not self._connected:
-                _LOGGER.warning("Modbus client not connected, skipping read_input")
+                if not self._log_suppressed:
+                    _LOGGER.warning("Modbus client not connected, skipping read_input")
+                    self._log_suppressed = True
                 return None
+            self._log_suppressed = False
             return self._data_input.get(address)
+
 
     async def write_register(self, address: int, value: int) -> bool:
         async with self._lock:
             if not await self._ensure_connected():
-                _LOGGER.error("Could not connect to Modbus server for writing")
+                if not self._log_suppressed:
+                    _LOGGER.error("Could not connect to Modbus server for writing")
+                    self._log_suppressed = True
                 return False
+            self._log_suppressed = False
             try:
                 rr = self._client.write_register(address=address, value=value, slave=self._slave)
                 if rr.isError():
@@ -128,8 +145,11 @@ class ThesslaGreenModbusController:
     async def read_coil(self, address):
         async with self._lock:
             if not await self._ensure_connected():
-                _LOGGER.error("Could not connect to Modbus server for coil read")
+                if not self._log_suppressed:
+                    _LOGGER.error("Could not connect to Modbus server for coil read")
+                    self._log_suppressed = True
                 return None
+            self._log_suppressed = False
             try:
                 rr = self._client.read_coils(address=address, count=1, slave=self._slave)
                 if rr.isError():
