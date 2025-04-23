@@ -1,4 +1,3 @@
-"""Platform for sensor integration."""
 from __future__ import annotations
 import logging
 
@@ -9,7 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
-from .modbus_controller import ModbusController
+from .modbus_controller import ThesslaGreenModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,13 +33,14 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    controller: ModbusController = modbus_data["controller"]
+    controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
         ModbusGenericSensor(controller=controller, slave=slave, **sensor)
         for sensor in SENSORS
     ])
+
 
 class ModbusGenericSensor(SensorEntity):
     """Representation of a Sensor."""
@@ -66,13 +66,12 @@ class ModbusGenericSensor(SensorEntity):
             "model": "Modbus Rekuperator",
         }
 
-    def update(self) -> None:
+    async def async_update(self) -> None:
         try:
-            raw_value = self._controller.read_register(
-                input_type=self._input_type,
-                address=self._address,
-                slave=self._slave
-            )
+            if self._input_type == "input":
+                raw_value = await self._controller.read_input(self._address)
+            else:
+                raw_value = await self._controller.read_holding(self._address)
 
             if raw_value is None:
                 return

@@ -1,132 +1,100 @@
-from pymodbus.client.tcp import ModbusTcpClient
+from pymodbus.client import ModbusTcpClient
 from pymodbus.exceptions import ModbusIOException
-import time
-import errno
+import asyncio
 import logging
 
 _LOGGER = logging.getLogger(__name__)
 
-
-class ModbusController:
-    def __init__(self, host: str, port: int, timeout: int = 5):
-        self._client = ModbusTcpClient(host=host, port=port, timeout=timeout)
+class ThesslaGreenModbusController:
+    def __init__(self, host: str, port: int, slave_id: int, update_interval: int = 30):
         self._host = host
         self._port = port
-        self._last_read_time = {}  # (type, address, slave): timestamp
-        self._throttle_ttl = 15.0   # sekundy – minimalny odstęp czasu między odczytami
+        self._slave = slave_id
+        self._update_interval = update_interval
+        self._client = ModbusTcpClient(host=self._host, port=self._port)
+        self._data_holding = {}
+        self._data_input = {}
+        self._lock = asyncio.Lock()
+        self._task = None
 
-    def connect(self) -> bool:
-        if not self._client.connect():
-            _LOGGER.error(f"Failed to connect to Modbus server at {self._host}:{self._port}")
-            return False
-        return True
+    async def start(self):
+        self._task = asyncio.create_task(self._scheduler())
 
-    def close(self):
+    async def stop(self):
+        if self._task:
+            self._task.cancel()
         self._client.close()
 
-    def ensure_connected(self) -> bool:
-        if not self._client.connected:
-            _LOGGER.warning(f"Modbus client disconnected from {self._host}:{self._port}, attempting reconnect...")
-            self._client.close()
-            self._client = ModbusTcpClient(host=self._host, port=self._port)  # odtwórz klienta na nowo
+    async def _scheduler(self):
+        while True:
+            try:
+                await self._update_all()
+            except Exception as e:
+                _LOGGER.error("Scheduler error: %s", e)
+            await asyncio.sleep(self._update_interval)
+
+    async def _update_all(self):
+        async with self._lock:
             if not self._client.connect():
-                _LOGGER.error(f"Reconnection to Modbus server at {self._host}:{self._port} failed")
+                _LOGGER.error("Could not connect to Modbus server at %s:%s", self._host, self._port)
+                return
+
+            try:
+                # Read holding registers in blocks
+                for start in [0, 16, 32, 48]:
+                    rr = self._client.read_holding_registers(address=start, count=16, slave=self._slave)
+                    if not rr.isError():
+                        for i, val in enumerate(rr.registers):
+                            self._data_holding[start + i] = val
+                    else:
+                        _LOGGER.warning("Error reading holding registers %s-%s", start, start + 15)
+
+                # Read input registers in blocks
+                for start in [0, 16]:
+                    rr = self._client.read_input_registers(address=start, count=16, slave=self._slave)
+                    if not rr.isError():
+                        for i, val in enumerate(rr.registers):
+                            self._data_input[start + i] = val
+                    else:
+                        _LOGGER.warning("Error reading input registers %s-%s", start, start + 15)
+
+            except ModbusIOException as e:
+                _LOGGER.error("Modbus read failed: %s", e)
+
+    async def read_holding(self, address):
+        async with self._lock:
+            return self._data_holding.get(address)
+
+    async def read_input(self, address):
+        async with self._lock:
+            return self._data_input.get(address)
+
+    async def write_register(self, address: int, value: int) -> bool:
+        async with self._lock:
+            if not self._client.connect():
+                _LOGGER.error("Could not connect to Modbus server for writing")
                 return False
-            _LOGGER.info(f"Successfully reconnected to Modbus server at {self._host}:{self._port}")
-        return True
+            try:
+                rr = self._client.write_register(address=address, value=value, slave=self._slave)
+                if rr.isError():
+                    _LOGGER.error("Modbus write error at address %s with value %s", address, value)
+                    return False
+                return True
+            except Exception as e:
+                _LOGGER.exception("Exception during Modbus write: %s", e)
+                return False
 
-    @property
-    def client(self) -> ModbusTcpClient:
-        return self._client
-
-    def _throttled(self, key: tuple) -> bool:
-        now = time.time()
-        last_time = self._last_read_time.get(key, 0)
-        if now - last_time < self._throttle_ttl:
-            return True
-        self._last_read_time[key] = now
-        return False
-
-    def _safe_modbus_call(self, func, *args, **kwargs):
-        """Executes a Modbus function with automatic reconnection retry on connection errors."""
-        if not self.ensure_connected():
-            return None
-
-        try:
-            return func(*args, **kwargs)
-
-        except (BrokenPipeError, ConnectionResetError, ModbusIOException, OSError) as e:
-            if isinstance(e, OSError) and e.errno not in (errno.EPIPE, errno.ECONNRESET, errno.EBADF):
-                raise
-
-            _LOGGER.warning(f"Connection lost or timeout: {e}. Reconnecting and retrying...")
-            self._client.close()
-            self._client = ModbusTcpClient(host=self._host, port=self._port)
-            if self._client.connect():
-                try:
-                    return func(*args, **kwargs)
-                except Exception as e2:
-                    _LOGGER.exception(f"Retry failed after reconnect: {e2}")
-            else:
-                _LOGGER.error("Reconnect failed.")
-
-        except Exception as e:
-            _LOGGER.exception(f"Unexpected exception during Modbus operation: {e}")
-
-        return None
-
-    def read_register(self, input_type: str, address: int, slave: int = 1) -> int | None:
-        key = (input_type, address, slave)
-        if self._throttled(key):
-            return None
-
-        def read():
-            if input_type == "input":
-                return self._client.read_input_registers(address=address, count=1, slave=slave)
-            return self._client.read_holding_registers(address=address, count=1, slave=slave)
-
-        rr = self._safe_modbus_call(read)
-        if rr is None or rr.isError():
-            _LOGGER.error(f"Modbus read error (type={input_type}) at address {address}")
-            return None
-
-        value = rr.registers[0]
-        return value - 0x10000 if value >= 0x8000 else value
-
-    def read_holding(self, address: int, slave: int = 1) -> int | None:
-        key = ("holding", address, slave)
-        if self._throttled(key):
-            return None
-
-        def read():
-            return self._client.read_holding_registers(address=address, count=1, slave=slave)
-
-        rr = self._safe_modbus_call(read)
-        if rr is None or rr.isError():
-            _LOGGER.error(f"Modbus holding register read error at address {address}")
-            return None
-
-        value = rr.registers[0]
-        return value - 0x10000 if value >= 0x8000 else value
-
-    def read_coil(self, address: int, slave: int = 1) -> bool | None:
-        def read():
-            return self._client.read_coils(address=address, count=1, slave=slave)
-
-        rr = self._safe_modbus_call(read)
-        if rr is None or rr.isError():
-            _LOGGER.error(f"Modbus coil read error at address {address}")
-            return None
-
-        return bool(rr.bits[0])
-
-    def write_register(self, address: int, value: int, slave: int = 1) -> bool:
-        def write():
-            return self._client.write_register(address=address, value=value, slave=slave)
-
-        rr = self._safe_modbus_call(write)
-        if rr is None or rr.isError():
-            _LOGGER.error(f"Modbus write error at address {address} with value {value}")
-            return False
-
-        return True
+    async def read_coil(self, address):
+        async with self._lock:
+            if not self._client.connect():
+                _LOGGER.error("Could not connect to Modbus server for coil read")
+                return None
+            try:
+                rr = self._client.read_coils(address=address, count=1, slave=self._slave)
+                if rr.isError():
+                    _LOGGER.error("Modbus coil read error at address %s", address)
+                    return None
+                return bool(rr.bits[0])
+            except Exception as e:
+                _LOGGER.exception("Exception during Modbus coil read: %s", e)
+                return None

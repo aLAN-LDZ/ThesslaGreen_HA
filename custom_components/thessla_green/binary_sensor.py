@@ -4,10 +4,10 @@ import logging
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
-from .modbus_controller import ModbusController
+from .modbus_controller import ThesslaGreenModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    controller: ModbusController = modbus_data["controller"]
+    controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
@@ -48,14 +48,12 @@ async def async_setup_entry(
 
 
 class ModbusBinarySensor(BinarySensorEntity):
-    """Representation of a binary Modbus sensor."""
-
     def __init__(
         self,
         name: str,
         address: int,
         input_type: str = "coil",
-        controller: ModbusController = None,
+        controller: ThesslaGreenModbusController = None,
         slave: int = 1,
         device_class: str | None = None,
         icon_on: str | None = None,
@@ -85,13 +83,13 @@ class ModbusBinarySensor(BinarySensorEntity):
             return None
         return self._icon_on if self._attr_is_on else self._icon_off
 
-    def update(self) -> None:
+    async def async_update(self) -> None:
         try:
             value: bool | None = None
             if self._input_type == "coil":
-                value = self._controller.read_coil(self._address, self._slave)
+                value = await self._controller.read_coil(self._address)
             elif self._input_type == "holding":
-                holding = self._controller.read_holding(self._address, self._slave)
+                holding = await self._controller.read_holding(self._address)
                 if holding is not None:
                     value = holding == 1
             else:

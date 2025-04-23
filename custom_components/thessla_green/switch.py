@@ -4,10 +4,10 @@ import logging
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
-from .modbus_controller import ModbusController
+from .modbus_controller import ThesslaGreenModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    controller: ModbusController = modbus_data["controller"]
+    controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
@@ -59,31 +59,31 @@ class ModbusSwitch(SwitchEntity):
             "model": "Modbus Rekuperator",
         }
 
-    def turn_on(self, **kwargs):
+    async def async_turn_on(self, **kwargs):
         try:
-            success = self._controller.write_register(self._address, self._command_on, self._slave)
+            success = await self._controller.write_register(self._address, self._command_on)
             if success and not self._verify:
                 self._attr_is_on = True
             elif self._verify:
-                self.update()
+                await self.async_update()
         except Exception as e:
             _LOGGER.exception(f"Error turning on {self._attr_name}: {e}")
 
-    def turn_off(self, **kwargs):
+    async def async_turn_off(self, **kwargs):
         try:
-            success = self._controller.write_register(self._address, self._command_off, self._slave)
+            success = await self._controller.write_register(self._address, self._command_off)
             if success and not self._verify:
                 self._attr_is_on = False
             elif self._verify:
-                self.update()
+                await self.async_update()
         except Exception as e:
             _LOGGER.exception(f"Error turning off {self._attr_name}: {e}")
 
-    def update(self):
+    async def async_update(self):
         if not self._verify:
             return
         try:
-            value = self._controller.read_register("holding", self._address, self._slave)
+            value = await self._controller.read_holding(self._address)
             if value is not None:
                 self._attr_is_on = (value == self._command_on)
         except Exception as e:

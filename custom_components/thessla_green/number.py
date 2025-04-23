@@ -4,11 +4,10 @@ import logging
 from homeassistant.components.number import NumberEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
 from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
-from .modbus_controller import ModbusController
+from .modbus_controller import ThesslaGreenModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +18,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    controller: ModbusController = modbus_data["controller"]
+    controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
@@ -29,7 +28,7 @@ async def async_setup_entry(
 
 
 class RekuperatorPredkoscNumber(NumberEntity):
-    def __init__(self, controller: ModbusController, slave: int):
+    def __init__(self, controller: ThesslaGreenModbusController, slave: int):
         self._attr_name = "Rekuperator Prędkość"
         self._address = 4210
         self._slave = slave
@@ -48,17 +47,17 @@ class RekuperatorPredkoscNumber(NumberEntity):
             "model": "Modbus Rekuperator",
         }
 
-    def update(self):
+    async def async_update(self):
         try:
-            value = self._controller.read_register("holding", self._address, self._slave)
+            value = await self._controller.read_holding(self._address)
             if value is not None:
                 self._attr_native_value = value
         except Exception as e:
             _LOGGER.exception(f"Exception during prędkość update: {e}")
 
-    def set_native_value(self, value: float) -> None:
+    async def async_set_native_value(self, value: float) -> None:
         try:
-            success = self._controller.write_register(self._address, int(value), self._slave)
+            success = await self._controller.write_register(self._address, int(value))
             if success:
                 self._attr_native_value = value
         except Exception as e:

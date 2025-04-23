@@ -1,10 +1,10 @@
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
-from pymodbus.client.tcp import ModbusTcpClient
 from .const import DOMAIN
-from .modbus_controller import ModbusController
+from .modbus_controller import ThesslaGreenModbusController
 import logging
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,10 +20,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     port = entry.data["port"]
     slave = entry.data["slave"]
 
-    controller = ModbusController(host=host, port=port)
-    if not controller.connect():
-        _LOGGER.error("Cannot connect to Modbus server.")
-        return False
+    controller = ThesslaGreenModbusController(
+        host=host,
+        port=port,
+        slave_id=slave,
+        update_interval=30
+    )
+
+    await controller.start()
 
     hass.data[DOMAIN][entry.entry_id] = {
         "controller": controller,
@@ -41,8 +45,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for platform in PLATFORMS
     )
 
-    controller: ModbusController = hass.data[DOMAIN][entry.entry_id]["controller"]
-    controller.close()
+    controller: ThesslaGreenModbusController = hass.data[DOMAIN][entry.entry_id]["controller"]
+    await controller.stop()
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
