@@ -1,7 +1,7 @@
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
-from .const import DOMAIN
+from .const import DOMAIN, CONF_HOST, CONF_PORT, CONF_SLAVE, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
 from .modbus_controller import ThesslaGreenModbusController
 import logging
 
@@ -16,15 +16,16 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
-    host = entry.data["host"]
-    port = entry.data["port"]
-    slave = entry.data["slave"]
+    entry.data[CONF_HOST]
+    entry.data[CONF_PORT]
+    slave = entry.data[CONF_SLAVE]
+    update_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
     controller = ThesslaGreenModbusController(
         host=host,
         port=port,
         slave_id=slave,
-        update_interval=30
+        update_interval=update_interval
     )
 
     await controller.start()

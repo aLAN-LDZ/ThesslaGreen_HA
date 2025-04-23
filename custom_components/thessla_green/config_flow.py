@@ -1,6 +1,6 @@
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_HOST, CONF_PORT
+from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN, CONF_SLAVE
@@ -22,5 +22,6 @@ class ThesslaGreenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required(CONF_HOST): str,
                 vol.Required(CONF_PORT, default=8899): int,
                 vol.Required(CONF_SLAVE, default=10): int,
+                vol.Optional(CONF_SCAN_INTERVAL, default=30): int,
             })
         )
