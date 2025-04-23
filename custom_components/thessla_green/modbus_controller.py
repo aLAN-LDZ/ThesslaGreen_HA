@@ -44,17 +44,26 @@ class ThesslaGreenModbusController:
         was_connected = self._connected
         connected = self._client.connect()
 
-        self._connected = connected
-
         if connected:
-            self._log_suppressed = False
-            if not was_connected:
-                _LOGGER.info("Modbus reconnected successfully.")
-            return True
-        else:
-            self._client.close()
-            self._client = ModbusTcpClient(host=self._host, port=self._port)
-            return False
+            try:
+                # TEST: odczyt rejestru 4387 (Rekuperator ON/OFF)
+                test = self._client.read_holding_registers(address=4387, count=1, slave=self._slave)
+                if test and not test.isError():
+                    if not was_connected:
+                        _LOGGER.info("Modbus reconnected successfully.")
+                    self._connected = True
+                    self._log_suppressed = False
+                    return True
+                else:
+                    _LOGGER.debug("Modbus connect OK, but test read of register 4387 failed.")
+            except Exception as e:
+                _LOGGER.debug("Modbus test read of register 4387 raised exception: %s", e)
+
+        # Połączenie nie działa – reset klienta
+        self._connected = False
+        self._client.close()
+        self._client = ModbusTcpClient(host=self._host, port=self._port)
+        return False
 
     async def _scheduler(self):
         retry_interval = 60
