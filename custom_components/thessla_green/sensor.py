@@ -1,4 +1,3 @@
-"""Platform for sensor integration."""
 from __future__ import annotations
 import logging
 
@@ -9,6 +8,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
+from .modbus_controller import ThesslaGreenModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,18 +33,19 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    client = modbus_data["client"]
+    controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
-        ModbusGenericSensor(client=client, slave=slave, **sensor)
+        ModbusGenericSensor(controller=controller, slave=slave, **sensor)
         for sensor in SENSORS
     ])
+
 
 class ModbusGenericSensor(SensorEntity):
     """Representation of a Sensor."""
 
-    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, client=None, slave=1):
+    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, controller=None, slave=1):
         self._attr_name = name
         self._address = address
         self._input_type = input_type
@@ -52,8 +53,8 @@ class ModbusGenericSensor(SensorEntity):
         self._precision = precision
         self._unit = unit
         self._slave = slave
+        self._controller = controller
         self._attr_native_unit_of_measurement = unit
-        self._client = client
         self._attr_native_value = None
         self._attr_icon = icon
         self._attr_unique_id = f"thessla_sensor_{slave}_{address}"
@@ -65,23 +66,18 @@ class ModbusGenericSensor(SensorEntity):
             "model": "Modbus Rekuperator",
         }
 
-    def update(self) -> None:
+    async def async_update(self) -> None:
         try:
             if self._input_type == "input":
-                rr = self._client.read_input_registers(address=self._address, count=1, slave=self._slave)
+                raw_value = await self._controller.read_input(self._address)
             else:
-                rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
+                raw_value = await self._controller.read_holding(self._address)
 
-            if rr.isError():
-                _LOGGER.error(f"Modbus read error for {self._attr_name}: {rr}")
+            if raw_value is None:
                 return
-
-            raw_value = rr.registers[0]
-            if raw_value >= 0x8000:
-                raw_value -= 0x10000  # convert to signed int16
 
             value = raw_value * self._scale
             self._attr_native_value = round(value, self._precision)
 
         except Exception as e:
-            _LOGGER.exception(f"Error reading Modbus data: {e}")
+            _LOGGER.exception(f"Error in ModbusGenericSensor update: {e}")

@@ -4,9 +4,10 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType
+from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
+from .modbus_controller import ThesslaGreenModbusController
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,21 +30,21 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    client = modbus_data["client"]
+    controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
 
     async_add_entities([
-        RekuperatorTrybSelect(client=client, slave=slave),
-        RekuperatorSezonSelect(client=client, slave=slave),
+        RekuperatorTrybSelect(controller=controller, slave=slave),
+        RekuperatorSezonSelect(controller=controller, slave=slave),
     ])
 
 
 class RekuperatorTrybSelect(SelectEntity):
-    def __init__(self, client, slave: int):
+    def __init__(self, controller: ThesslaGreenModbusController, slave: int):
         self._attr_name = "Rekuperator Tryb"
         self._address = 4224
         self._slave = slave
-        self._client = client
+        self._controller = controller
         self._attr_options = list(MODES.keys())
         self._attr_current_option = None
         self._value_map = {v: k for k, v in MODES.items()}
@@ -56,38 +57,34 @@ class RekuperatorTrybSelect(SelectEntity):
             "model": "Modbus Rekuperator",
         }
 
-    def update(self):
+    async def async_update(self):
         try:
-            rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
-            if rr.isError():
-                _LOGGER.error(f"Error reading rekuperator tryb: {rr}")
-                return
-
-            raw_value = rr.registers[0]
-            self._attr_current_option = self._value_map.get(raw_value)
-
+            value = await self._controller.read_holding(self._address)
+            if value is not None:
+                self._attr_current_option = self._value_map.get(value)
         except Exception as e:
             _LOGGER.exception(f"Exception during tryb update: {e}")
 
-    def select_option(self, option: str) -> None:
+    async def async_select_option(self, option: str) -> None:
         try:
             code = MODES.get(option)
             if code is None:
                 _LOGGER.error(f"Unknown option selected: {option}")
                 return
 
-            self._client.write_register(address=self._address, value=code, slave=self._slave)
-            self._attr_current_option = option
+            success = await self._controller.write_register(self._address, code)
+            if success:
+                self._attr_current_option = option
 
         except Exception as e:
             _LOGGER.exception(f"Exception during tryb selection: {e}")
 
 class RekuperatorSezonSelect(SelectEntity):
-    def __init__(self, client, slave: int):
+    def __init__(self, controller: ThesslaGreenModbusController, slave: int):
         self._attr_name = "Rekuperator Sezon"
         self._address = 4209
         self._slave = slave
-        self._client = client
+        self._controller = controller
         self._attr_options = list(SEASONS.keys())
         self._attr_current_option = None
         self._value_map = {v: k for k, v in SEASONS.items()}
@@ -100,28 +97,24 @@ class RekuperatorSezonSelect(SelectEntity):
             "model": "Modbus Rekuperator",
         }
 
-    def update(self):
+    async def async_update(self):
         try:
-            rr = self._client.read_holding_registers(address=self._address, count=1, slave=self._slave)
-            if rr.isError():
-                _LOGGER.error(f"Error reading sezon rekuperatora: {rr}")
-                return
-
-            raw_value = rr.registers[0]
-            self._attr_current_option = self._value_map.get(raw_value)
-
+            value = await self._controller.read_holding(self._address)
+            if value is not None:
+                self._attr_current_option = self._value_map.get(value)
         except Exception as e:
             _LOGGER.exception(f"Exception during sezon update: {e}")
 
-    def select_option(self, option: str) -> None:
+    async def async_select_option(self, option: str) -> None:
         try:
             code = SEASONS.get(option)
             if code is None:
                 _LOGGER.error(f"Unknown option selected: {option}")
                 return
 
-            self._client.write_register(address=self._address, value=code, slave=self._slave)
-            self._attr_current_option = option
+            success = await self._controller.write_register(self._address, code)
+            if success:
+                self._attr_current_option = option
 
         except Exception as e:
             _LOGGER.exception(f"Exception during sezon selection: {e}")

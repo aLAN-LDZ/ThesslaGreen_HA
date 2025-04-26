@@ -1,9 +1,10 @@
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.typing import ConfigType
-from pymodbus.client.tcp import ModbusTcpClient
-from .const import DOMAIN
+from .const import DOMAIN, CONF_HOST, CONF_PORT, CONF_SLAVE, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+from .modbus_controller import ThesslaGreenModbusController
 import logging
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -15,25 +16,27 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
-    host = entry.data["host"]
-    port = entry.data["port"]
-    slave = entry.data["slave"]
+    host = entry.data[CONF_HOST]
+    port = entry.data[CONF_PORT]
+    slave = entry.data[CONF_SLAVE]
+    update_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
-    # Tworzenie klienta Modbus i zapisanie w hass.data
-    client = ModbusTcpClient(host=host, port=port, timeout=5)
-    if not client.connect():
-        _LOGGER.error("Cannot connect to Modbus server.")
-        return False
+    controller = ThesslaGreenModbusController(
+        host=host,
+        port=port,
+        slave_id=slave,
+        update_interval=update_interval
+    )
+
+    await controller.start()
 
     hass.data[DOMAIN][entry.entry_id] = {
-        "client": client,
+        "controller": controller,
         "slave": slave,
     }
 
     for platform in PLATFORMS:
-        hass.async_create_task(
-            hass.config_entries.async_forward_entry_setup(entry, platform)
-        )
+        await hass.config_entries.async_forward_entry_setup(entry, platform)
 
     return True
 
@@ -43,9 +46,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for platform in PLATFORMS
     )
 
-    # Zamykanie połączenia Modbus
-    client = hass.data[DOMAIN][entry.entry_id]["client"]
-    client.close()
+    controller: ThesslaGreenModbusController = hass.data[DOMAIN][entry.entry_id]["controller"]
+    await controller.stop()
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
