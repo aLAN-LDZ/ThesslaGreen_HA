@@ -74,12 +74,6 @@ class ThesslaGreenModbusController:
         self._client = ModbusTcpClient(host=self._host, port=self._port)
         return False
 
-        # Połączenie nie działa – reset klienta
-        self._connected = False
-        self._client.close()
-        self._client = ModbusTcpClient(host=self._host, port=self._port)
-        return False
-
     async def _scheduler(self):
         retry_interval = 60
 
