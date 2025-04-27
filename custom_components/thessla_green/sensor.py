@@ -84,7 +84,12 @@ class ModbusGenericSensor(SensorEntity):
         if raw_value is None:
             return None
 
-        value = raw_value * self._scale
+        # Konwersja na signed int16
+        raw = raw_value
+        if raw > 0x7FFF:
+            raw -= 0x10000
+
+        value = raw * self._scale
         return round(value, self._precision)
 
     async def async_update(self):
