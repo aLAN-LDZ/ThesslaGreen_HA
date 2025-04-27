@@ -13,9 +13,9 @@ from .modbus_controller import ThesslaGreenModbusController
 _LOGGER = logging.getLogger(__name__)
 
 SWITCHES = [
-    {"name": "Rekuperator bypass", "address": 4320, "command_on": 0, "command_off": 1, "verify": False},
-    {"name": "Rekuperator ON/OFF", "address": 4387, "command_on": 1, "command_off": 0, "verify": False},
-    {"name": "Rekuperator mode", "address": 4208, "command_on": 0, "command_off": 1, "verify": False},
+    {"name": "Rekuperator bypass", "address": 4320, "command_on": 0, "command_off": 1, "verify": True},
+    {"name": "Rekuperator ON/OFF", "address": 4387, "command_on": 1, "command_off": 0, "verify": True},
+    {"name": "Rekuperator mode", "address": 4208, "command_on": 0, "command_off": 1, "verify": True},
 ]
 
 async def async_setup_entry(
@@ -43,8 +43,6 @@ async def async_setup_entry(
 
 
 class ModbusSwitch(SwitchEntity):
-    """Representation of a Modbus-based switch."""
-
     def __init__(self, name, address, command_on, command_off, verify, controller, slave, scan_interval):
         self._attr_name = name
         self._address = address
@@ -65,25 +63,26 @@ class ModbusSwitch(SwitchEntity):
         }
 
     async def async_turn_on(self, **kwargs):
-        """Turn the switch ON."""
         try:
             success = await self._controller.write_register(self._address, self._command_on)
-            if success:
+            if success and not self._verify:
                 self._attr_is_on = True
+            elif self._verify:
+                await self.async_update()
         except Exception as e:
             _LOGGER.exception(f"Error turning on {self._attr_name}: {e}")
 
     async def async_turn_off(self, **kwargs):
-        """Turn the switch OFF."""
         try:
             success = await self._controller.write_register(self._address, self._command_off)
-            if success:
+            if success and not self._verify:
                 self._attr_is_on = False
+            elif self._verify:
+                await self.async_update()
         except Exception as e:
             _LOGGER.exception(f"Error turning off {self._attr_name}: {e}")
 
     async def async_update(self):
-        """Read actual value from Modbus if verify is enabled."""
         if not self._verify:
             return
         try:
