@@ -2,19 +2,22 @@
 
 ## 🇵🇱 Integracja Home Assistant dla rekuperatorów Thessla Green z komunikacją Modbus TCP
 
-> 🛠️ Projekt w wersji rozwojowej — ale już działa stabilnie i odczytuje większość danych!
+> 🛠️ Projekt rozwijany — aktualnie stabilny i w pełni funkcjonalny!
 
 ### ✨ Funkcje
 
-- Odczyt danych z rekuperatora Thessla Green przez **Modbus TCP**
-- Automatyczne tworzenie encji:
+- Komunikacja z rekuperatorem Thessla Green przez **Modbus TCP**
+- Wsparcie dla pełnego zakresu danych:
   - `sensor` — temperatury, przepływy powietrza, statusy, błędy
-  - `binary_sensor` — stany pracy, siłowniki bypassu
-  - `switch` — np. włącz/wyłącz, bypass
-  - `select` — tryby pracy, sezon (zima/lato)
+  - `binary_sensor` — stany pracy (także przez `coils`), siłowniki bypassu, alarmy
+  - `switch` — bypass, on/off, zmiana trybu
+  - `select` — wybór trybu pracy i sezonu (lato/zima)
   - `number` — ustawienie prędkości wentylatora (0–100%)
-- Obsługa wielu encji jako jedno urządzenie w Home Assistant
-- Konfiguracja przez interfejs graficzny (config flow)
+- Obsługa stanów w czasie rzeczywistym z szybkim odświeżaniem (domyślnie co 30s, konfigurowalne)
+- Wsparcie błyskawicznego wykrywania utraty komunikacji
+- Konfiguracja przez interfejs użytkownika (UI Config Flow)
+- Integracja automatycznie grupuje wszystkie encje pod jedno urządzenie w Home Assistant
+- Wsparcie dla HACS (Home Assistant Community Store)
 
 ---
 
@@ -26,7 +29,7 @@
 2. Zainstaluj integrację **Thessla Green**
 3. Zrestartuj Home Assistant
 4. Przejdź do `Ustawienia → Integracje → Dodaj integrację`
-5. Wybierz **Thessla Green** i skonfiguruj IP, port oraz numer slave
+5. Wybierz **Thessla Green** i skonfiguruj IP urządzenia, port oraz numer slave
 
 #### Ręcznie
 
@@ -35,25 +38,28 @@
     git clone https://github.com/twoj_uzytkownik/ThesslaGreen_HA.git custom_components/thessla_green
     ```
 2. Zrestartuj Home Assistant
-3. Dodaj integrację jak wyżej
+3. Dodaj integrację jak powyżej
 
 ---
 
 ## 🇬🇧 ThesslaGreen_HA – Home Assistant integration for Thessla Green heat recovery units
 
-> 🛠️ Work in progress – but already stable and supports most sensors!
+> 🛠️ Work in progress — now stable and fully functional!
 
 ### ✨ Features
 
-- Read data from Thessla Green unit via **Modbus TCP**
-- Automatically creates entities:
-  - `sensor` — temperatures, airflows, statuses, errors
-  - `binary_sensor` — state confirmations, bypass actuator
-  - `switch` — on/off, bypass, etc.
-  - `select` — operation modes, season (summer/winter)
-  - `number` — fan speed setting (0–100%)
-- Groups all entities into a single device in Home Assistant
-- Fully configurable via UI (config flow)
+- Communicates with Thessla Green units over **Modbus TCP**
+- Full range of data supported:
+  - `sensor` — temperatures, airflow, statuses, errors
+  - `binary_sensor` — state confirmations (via coils), bypass actuator, alarms
+  - `switch` — bypass, on/off, mode change
+  - `select` — operation modes and season (summer/winter)
+  - `number` — set fan speed (0–100%)
+- Real-time updates with fast polling (default 30s, configurable)
+- Robust error handling and reconnection logic
+- Easy setup via Home Assistant UI (Config Flow)
+- All entities grouped into a single device in Home Assistant
+- Fully HACS-compatible (Home Assistant Community Store)
 
 ---
 
@@ -65,11 +71,11 @@
 2. Install **Thessla Green** integration
 3. Restart Home Assistant
 4. Go to `Settings → Integrations → Add Integration`
-5. Select **Thessla Green** and configure IP, port, and slave ID
+5. Select **Thessla Green** and configure IP address, port, and slave ID
 
-#### Manual installation
+#### Manual Installation
 
-1. Clone this repository into the `custom_components` folder:
+1. Clone this repository into your `custom_components` folder:
     ```bash
     git clone https://github.com/your_username/ThesslaGreen_HA.git custom_components/thessla_green
     ```
