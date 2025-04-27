@@ -1,6 +1,7 @@
 from pymodbus.client import ModbusTcpClient
 import asyncio
 import logging
+import time
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class ThesslaGreenModbusController:
         self._client = ModbusTcpClient(host=self._host, port=self._port)
         self._data_holding = {}
         self._data_input = {}
+        self._data_coil = {}
         self._lock = asyncio.Lock()
         self._task = None
 
@@ -22,12 +24,16 @@ class ThesslaGreenModbusController:
         self._connected = False
         self._log_suppressed = False
 
+        self._last_update_timestamp = None
+        self._last_update_interval = None
+
         self._holding_blocks = [
             (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
             (4224, 1), (4320, 1), (4387, 1),
             (8192, 2), (8208, 1), (8222, 2), (8330, 2), (8444, 1)
         ]
         self._input_blocks = [(16, 4), (22, 1)]
+        self._coil_blocks = [(9, 3)]
 
     async def start(self):
         self._task = asyncio.create_task(self._scheduler())
@@ -62,7 +68,6 @@ class ThesslaGreenModbusController:
             except Exception as e:
                 _LOGGER.debug("Modbus test read of register 4387 raised exception: %s", e)
 
-        # Połączenie nie działa – pełny reset klienta z opóźnieniem
         _LOGGER.warning("Modbus connection failed. Resetting Modbus client...")
         self._connected = False
         try:
@@ -70,7 +75,7 @@ class ThesslaGreenModbusController:
         except Exception as e:
             _LOGGER.debug("Exception while closing client: %s", e)
 
-        await asyncio.sleep(1)  # Daj czas na zamknięcie socketu
+        await asyncio.sleep(1)
         self._client = ModbusTcpClient(host=self._host, port=self._port)
         return False
 
@@ -114,6 +119,12 @@ class ThesslaGreenModbusController:
             if not await self._ensure_connected():
                 raise ConnectionError(f"Could not connect to Modbus server at {self._host}:{self._port}")
 
+            now = time.time()
+            if self._last_update_timestamp is not None:
+                self._last_update_interval = now - self._last_update_timestamp
+            self._last_update_timestamp = now
+
+            # Odczyt HOLDING
             for start, count in self._holding_blocks:
                 rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
                 if not rr.isError():
@@ -122,6 +133,7 @@ class ThesslaGreenModbusController:
                 else:
                     _LOGGER.warning("Error reading holding registers %s-%s", start, start + count - 1)
 
+            # Odczyt INPUT
             for start, count in self._input_blocks:
                 rr = self._client.read_input_registers(address=start, count=count, slave=self._slave)
                 if not rr.isError():
@@ -129,6 +141,15 @@ class ThesslaGreenModbusController:
                         self._data_input[start + i] = val
                 else:
                     _LOGGER.warning("Error reading input registers %s-%s", start, start + count - 1)
+
+            # Odczyt COIL
+            for start, count in self._coil_blocks:
+                rr = self._client.read_coils(address=start, count=count, slave=self._slave)
+                if not rr.isError():
+                    for i, val in enumerate(rr.bits):
+                        self._data_coil[start + i] = int(val)
+                else:
+                    _LOGGER.warning("Error reading coils %s-%s", start, start + count - 1)
 
     async def read_holding(self, address):
         async with self._lock:
@@ -185,3 +206,8 @@ class ThesslaGreenModbusController:
             except Exception as e:
                 _LOGGER.exception("Exception during Modbus coil read: %s", e)
                 return None
+
+    async def get_last_update_interval(self) -> float | None:
+        """Return time in seconds between last two Modbus full updates."""
+        async with self._lock:
+            return self._last_update_interval
