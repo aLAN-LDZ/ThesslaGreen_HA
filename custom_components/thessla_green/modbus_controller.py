@@ -14,6 +14,7 @@ class ThesslaGreenModbusController:
         self._client = ModbusTcpClient(host=self._host, port=self._port)
         self._data_holding = {}
         self._data_input = {}
+        self._data_coil = {}
         self._lock = asyncio.Lock()
         self._task = None
 
@@ -32,6 +33,7 @@ class ThesslaGreenModbusController:
             (8192, 2), (8208, 1), (8222, 2), (8330, 2), (8444, 1)
         ]
         self._input_blocks = [(16, 4), (22, 1)]
+        self._coil_blocks = [(9, 3)]
 
     async def start(self):
         self._task = asyncio.create_task(self._scheduler())
@@ -122,6 +124,7 @@ class ThesslaGreenModbusController:
                 self._last_update_interval = now - self._last_update_timestamp
             self._last_update_timestamp = now
 
+            # Odczyt HOLDING
             for start, count in self._holding_blocks:
                 rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
                 if not rr.isError():
@@ -130,6 +133,7 @@ class ThesslaGreenModbusController:
                 else:
                     _LOGGER.warning("Error reading holding registers %s-%s", start, start + count - 1)
 
+            # Odczyt INPUT
             for start, count in self._input_blocks:
                 rr = self._client.read_input_registers(address=start, count=count, slave=self._slave)
                 if not rr.isError():
@@ -137,6 +141,15 @@ class ThesslaGreenModbusController:
                         self._data_input[start + i] = val
                 else:
                     _LOGGER.warning("Error reading input registers %s-%s", start, start + count - 1)
+
+            # Odczyt COIL
+            for start, count in self._coil_blocks:
+                rr = self._client.read_coils(address=start, count=count, slave=self._slave)
+                if not rr.isError():
+                    for i, val in enumerate(rr.bits):
+                        self._data_coil[start + i] = int(val)
+                else:
+                    _LOGGER.warning("Error reading coils %s-%s", start, start + count - 1)
 
     async def read_holding(self, address):
         async with self._lock:

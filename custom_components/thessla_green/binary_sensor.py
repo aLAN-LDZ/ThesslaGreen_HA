@@ -49,7 +49,6 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-
 class ModbusBinarySensor(BinarySensorEntity):
     """Representation of a Modbus binary sensor."""
 
@@ -90,7 +89,7 @@ class ModbusBinarySensor(BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
         if self._input_type == "coil":
-            value = self.coordinator.data["holding"].get(self._address)
+            value = self.coordinator.data["coil"].get(self._address)
             if value is None:
                 return None
             return bool(value)
@@ -112,10 +111,9 @@ class ModbusBinarySensor(BinarySensorEntity):
         return self._icon_on if self.is_on else self._icon_off
 
     async def async_update(self):
-        """Update method."""
-        # Nic nie robimy — coordinator sam aktualizuje dane.
+        """No manual polling needed — coordinator handles data updates."""
         pass
 
     async def async_added_to_hass(self):
-        """When entity is added to HA."""
+        """Register entity with coordinator updates."""
         self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))

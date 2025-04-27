@@ -1,5 +1,3 @@
-# coordinator.py
-
 import logging
 from datetime import timedelta
 
@@ -32,6 +30,7 @@ class ThesslaGreenCoordinator(DataUpdateCoordinator):
             return {
                 "holding": self.controller._data_holding.copy(),
                 "input": self.controller._data_input.copy(),
+                "coil": self.controller._data_coil.copy(),
             }
         except Exception as err:
             raise UpdateFailed(f"Error fetching Modbus data: {err}") from err
