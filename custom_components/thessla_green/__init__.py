@@ -33,6 +33,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][entry.entry_id] = {
         "controller": controller,
         "slave": slave,
+        "scan_interval": update_interval,
     }
 
     for platform in PLATFORMS:

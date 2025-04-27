@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import timedelta
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant
@@ -31,7 +32,6 @@ BINARY_SENSORS = [
     {"name": "Rekuperator Wymiana Filtrów", "address": 8444, "input_type": "holding", "icon_on": "mdi:air-filter", "icon_off": "mdi:fan-alert"},
 ]
 
-
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -40,9 +40,10 @@ async def async_setup_entry(
     modbus_data = hass.data[DOMAIN][entry.entry_id]
     controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
+    scan_interval = modbus_data["scan_interval"]
 
     async_add_entities([
-        ModbusBinarySensor(controller=controller, slave=slave, **sensor)
+        ModbusBinarySensor(controller=controller, slave=slave, scan_interval=scan_interval, **sensor)
         for sensor in BINARY_SENSORS
     ])
 
@@ -58,6 +59,7 @@ class ModbusBinarySensor(BinarySensorEntity):
         device_class: str | None = None,
         icon_on: str | None = None,
         icon_off: str | None = None,
+        scan_interval: int = 30,
     ):
         self._attr_name = name
         self._address = address
@@ -69,6 +71,7 @@ class ModbusBinarySensor(BinarySensorEntity):
         self._attr_device_class = device_class
         self._icon_on = icon_on
         self._icon_off = icon_off
+        self._attr_scan_interval = timedelta(seconds=scan_interval)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},

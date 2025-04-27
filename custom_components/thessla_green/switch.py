@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import timedelta  # <-- DODANE
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.core import HomeAssistant
@@ -25,6 +26,7 @@ async def async_setup_entry(
     modbus_data = hass.data[DOMAIN][entry.entry_id]
     controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
+    scan_interval = modbus_data["scan_interval"]
 
     async_add_entities([
         ModbusSwitch(
@@ -34,14 +36,14 @@ async def async_setup_entry(
             command_off=sw["command_off"],
             verify=sw.get("verify", False),
             controller=controller,
-            slave=slave
+            slave=slave,
+            scan_interval=scan_interval,
         ) for sw in SWITCHES
     ])
 
 
-
 class ModbusSwitch(SwitchEntity):
-    def __init__(self, name, address, command_on, command_off, verify, controller, slave):
+    def __init__(self, name, address, command_on, command_off, verify, controller, slave, scan_interval):
         self._attr_name = name
         self._address = address
         self._command_on = command_on
@@ -51,6 +53,7 @@ class ModbusSwitch(SwitchEntity):
         self._controller = controller
         self._attr_is_on = False
         self._attr_unique_id = f"thessla_switch_{slave}_{self._address}"
+        self._attr_scan_interval = timedelta(seconds=scan_interval)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},

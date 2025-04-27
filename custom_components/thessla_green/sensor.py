@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import timedelta
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import UnitOfTemperature
@@ -35,9 +36,10 @@ async def async_setup_entry(
     modbus_data = hass.data[DOMAIN][entry.entry_id]
     controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
+    scan_interval = modbus_data["scan_interval"]
 
     async_add_entities([
-        ModbusGenericSensor(controller=controller, slave=slave, **sensor)
+        ModbusGenericSensor(controller=controller, slave=slave, scan_interval=scan_interval, **sensor)
         for sensor in SENSORS
     ])
 
@@ -45,7 +47,7 @@ async def async_setup_entry(
 class ModbusGenericSensor(SensorEntity):
     """Representation of a Sensor."""
 
-    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, controller=None, slave=1):
+    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, controller=None, slave, scan_interval):
         self._attr_name = name
         self._address = address
         self._input_type = input_type
@@ -58,6 +60,7 @@ class ModbusGenericSensor(SensorEntity):
         self._attr_native_value = None
         self._attr_icon = icon
         self._attr_unique_id = f"thessla_sensor_{slave}_{address}"
+        self._attr_scan_interval = timedelta(seconds=scan_interval)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import timedelta
 
 from homeassistant.components.number import NumberEntity
 from homeassistant.core import HomeAssistant
@@ -20,15 +21,15 @@ async def async_setup_entry(
     modbus_data = hass.data[DOMAIN][entry.entry_id]
     controller: ThesslaGreenModbusController = modbus_data["controller"]
     slave = modbus_data["slave"]
+    scan_interval = modbus_data["scan_interval"]
 
     async_add_entities([
-        RekuperatorPredkoscNumber(controller=controller, slave=slave)
+        RekuperatorPredkoscNumber(controller=controller, slave=slave, scan_interval=scan_interval)
     ])
 
 
-
 class RekuperatorPredkoscNumber(NumberEntity):
-    def __init__(self, controller: ThesslaGreenModbusController, slave: int):
+    def __init__(self, controller: ThesslaGreenModbusController, slave: int, scan_interval: int):
         self._attr_name = "Rekuperator Prędkość"
         self._address = 4210
         self._slave = slave
@@ -39,6 +40,7 @@ class RekuperatorPredkoscNumber(NumberEntity):
         self._attr_native_step = 1
         self._attr_native_value = None
         self._attr_unique_id = f"thessla_number_{slave}_{self._address}"
+        self._attr_scan_interval = timedelta(seconds=scan_interval)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},
