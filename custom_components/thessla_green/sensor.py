@@ -47,7 +47,7 @@ async def async_setup_entry(
 class ModbusGenericSensor(SensorEntity):
     """Representation of a Sensor."""
 
-    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, controller=None, slave, scan_interval):
+    def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, controller=None, slave=1, scan_interval=30):
         self._attr_name = name
         self._address = address
         self._input_type = input_type
