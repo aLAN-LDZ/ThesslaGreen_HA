@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-from datetime import timedelta
 
 from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.core import HomeAssistant
@@ -8,7 +7,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
-from .modbus_controller import ThesslaGreenModbusController
+from .coordinator import ThesslaGreenCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,41 +36,44 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up the binary sensors."""
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    controller: ThesslaGreenModbusController = modbus_data["controller"]
+    coordinator: ThesslaGreenCoordinator = modbus_data["coordinator"]
     slave = modbus_data["slave"]
-    scan_interval = modbus_data["scan_interval"]
 
-    async_add_entities([
-        ModbusBinarySensor(controller=controller, slave=slave, scan_interval=scan_interval, **sensor)
+    entities = [
+        ModbusBinarySensor(coordinator=coordinator, slave=slave, **sensor)
         for sensor in BINARY_SENSORS
-    ])
+    ]
+
+    async_add_entities(entities)
+
 
 
 class ModbusBinarySensor(BinarySensorEntity):
+    """Representation of a Modbus binary sensor."""
+
     def __init__(
         self,
+        coordinator: ThesslaGreenCoordinator,
         name: str,
         address: int,
         input_type: str = "coil",
-        controller: ThesslaGreenModbusController = None,
         slave: int = 1,
         device_class: str | None = None,
         icon_on: str | None = None,
         icon_off: str | None = None,
-        scan_interval: int = 30,
     ):
+        self.coordinator = coordinator
         self._attr_name = name
         self._address = address
         self._input_type = input_type
-        self._controller = controller
         self._slave = slave
-        self._attr_is_on = None
-        self._attr_unique_id = f"thessla_binary_sensor_{slave}_{address}"
-        self._attr_device_class = device_class
         self._icon_on = icon_on
         self._icon_off = icon_off
-        self._attr_scan_interval = timedelta(seconds=scan_interval)
+
+        self._attr_unique_id = f"thessla_binary_sensor_{slave}_{address}"
+        self._attr_device_class = device_class
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},
@@ -81,26 +83,39 @@ class ModbusBinarySensor(BinarySensorEntity):
         }
     
     @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if the binary sensor is on."""
+        if self._input_type == "coil":
+            value = self.coordinator.data["holding"].get(self._address)
+            if value is None:
+                return None
+            return bool(value)
+
+        elif self._input_type == "holding":
+            value = self.coordinator.data["holding"].get(self._address)
+            if value is None:
+                return None
+            return value == 1
+
+        _LOGGER.error(f"Unknown input_type '{self._input_type}' for {self._attr_name}")
+        return None
+
+    @property
     def icon(self) -> str | None:
-        if self._attr_is_on is None:
+        """Return the icon to use."""
+        if self.is_on is None:
             return None
-        return self._icon_on if self._attr_is_on else self._icon_off
+        return self._icon_on if self.is_on else self._icon_off
 
-    async def async_update(self) -> None:
-        try:
-            value: bool | None = None
-            if self._input_type == "coil":
-                value = await self._controller.read_coil(self._address)
-            elif self._input_type == "holding":
-                holding = await self._controller.read_holding(self._address)
-                if holding is not None:
-                    value = holding == 1
-            else:
-                _LOGGER.error(f"Unknown input_type '{self._input_type}' for {self._attr_name}")
-                return
+    async def async_update(self):
+        """Update method."""
+        # Nic nie robimy — coordinator sam aktualizuje dane.
+        pass
 
-            if value is not None:
-                self._attr_is_on = value
-
-        except Exception as e:
-            _LOGGER.exception(f"Error updating binary sensor {self._attr_name}: {e}")
+    async def async_added_to_hass(self):
+        """When entity is added to HA."""
+        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))

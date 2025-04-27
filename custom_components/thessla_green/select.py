@@ -1,6 +1,5 @@
 from __future__ import annotations
 import logging
-from datetime import timedelta
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
@@ -8,7 +7,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
 
 from . import DOMAIN
-from .modbus_controller import ThesslaGreenModbusController
+from .coordinator import ThesslaGreenCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,28 +29,29 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
+    """Set up select entities."""
     modbus_data = hass.data[DOMAIN][entry.entry_id]
-    controller: ThesslaGreenModbusController = modbus_data["controller"]
+    coordinator: ThesslaGreenCoordinator = modbus_data["coordinator"]
     slave = modbus_data["slave"]
-    scan_interval = modbus_data["scan_interval"]
 
     async_add_entities([
-        RekuperatorTrybSelect(controller=controller, slave=slave, scan_interval=scan_interval),
-        RekuperatorSezonSelect(controller=controller, slave=slave, scan_interval=scan_interval),
+        RekuperatorTrybSelect(coordinator=coordinator, slave=slave),
+        RekuperatorSezonSelect(coordinator=coordinator, slave=slave),
     ])
 
 
 class RekuperatorTrybSelect(SelectEntity):
-    def __init__(self, controller: ThesslaGreenModbusController, slave: int, scan_interval: int):
-        self._attr_name = "Rekuperator Tryb"
+    """Representation of Rekuperator Tryb Select."""
+
+    def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int):
+        self.coordinator = coordinator
         self._address = 4224
         self._slave = slave
-        self._controller = controller
+        self._attr_name = "Rekuperator Tryb"
         self._attr_options = list(MODES.keys())
-        self._attr_current_option = None
         self._value_map = {v: k for k, v in MODES.items()}
+        self._reverse_map = MODES
         self._attr_unique_id = f"thessla_select_{slave}_{self._address}"
-        self._attr_scan_interval = timedelta(seconds=scan_interval)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},
@@ -60,39 +60,52 @@ class RekuperatorTrybSelect(SelectEntity):
             "model": "Modbus Rekuperator",
         }
 
-    async def async_update(self):
-        try:
-            value = await self._controller.read_holding(self._address)
-            if value is not None:
-                self._attr_current_option = self._value_map.get(value)
-        except Exception as e:
-            _LOGGER.exception(f"Exception during tryb update: {e}")
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current selected option."""
+        value = self.coordinator.data["holding"].get(self._address)
+        if value is None:
+            return None
+        return self._value_map.get(value)
 
     async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
         try:
-            code = MODES.get(option)
+            code = self._reverse_map.get(option)
             if code is None:
                 _LOGGER.error(f"Unknown option selected: {option}")
                 return
 
-            success = await self._controller.write_register(self._address, code)
+            success = await self.coordinator.controller.write_register(self._address, code)
             if success:
-                self._attr_current_option = option
+                await self.coordinator.async_request_refresh()
 
         except Exception as e:
             _LOGGER.exception(f"Exception during tryb selection: {e}")
 
+    async def async_update(self):
+        """No-op, data provided by coordinator."""
+        pass
+
+    async def async_added_to_hass(self):
+        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))
+
 class RekuperatorSezonSelect(SelectEntity):
-    def __init__(self, controller: ThesslaGreenModbusController, slave: int, scan_interval: int):
-        self._attr_name = "Rekuperator Sezon"
+    """Representation of Rekuperator Sezon Select."""
+
+    def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int):
+        self.coordinator = coordinator
         self._address = 4209
         self._slave = slave
-        self._controller = controller
+        self._attr_name = "Rekuperator Sezon"
         self._attr_options = list(SEASONS.keys())
-        self._attr_current_option = None
         self._value_map = {v: k for k, v in SEASONS.items()}
+        self._reverse_map = SEASONS
         self._attr_unique_id = f"thessla_sezon_select_{slave}_{self._address}"
-        self._attr_scan_interval = timedelta(seconds=scan_interval)
 
         self._attr_device_info = {
             "identifiers": {(DOMAIN, f"{slave}")},
@@ -101,24 +114,36 @@ class RekuperatorSezonSelect(SelectEntity):
             "model": "Modbus Rekuperator",
         }
 
-    async def async_update(self):
-        try:
-            value = await self._controller.read_holding(self._address)
-            if value is not None:
-                self._attr_current_option = self._value_map.get(value)
-        except Exception as e:
-            _LOGGER.exception(f"Exception during sezon update: {e}")
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current selected option."""
+        value = self.coordinator.data["holding"].get(self._address)
+        if value is None:
+            return None
+        return self._value_map.get(value)
 
     async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
         try:
-            code = SEASONS.get(option)
+            code = self._reverse_map.get(option)
             if code is None:
                 _LOGGER.error(f"Unknown option selected: {option}")
                 return
 
-            success = await self._controller.write_register(self._address, code)
+            success = await self.coordinator.controller.write_register(self._address, code)
             if success:
-                self._attr_current_option = option
+                await self.coordinator.async_request_refresh()
 
         except Exception as e:
             _LOGGER.exception(f"Exception during sezon selection: {e}")
+
+    async def async_update(self):
+        """No-op, data provided by coordinator."""
+        pass
+
+    async def async_added_to_hass(self):
+        self.async_on_remove(self.coordinator.async_add_listener(self.async_write_ha_state))
