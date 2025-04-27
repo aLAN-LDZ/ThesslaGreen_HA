@@ -3,7 +3,7 @@ import logging
 from datetime import timedelta
 
 from homeassistant.components.sensor import SensorEntity
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfTemperature, UnitOfTime
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
@@ -38,14 +38,17 @@ async def async_setup_entry(
     slave = modbus_data["slave"]
     scan_interval = modbus_data["scan_interval"]
 
-    async_add_entities([
+    entities = [
         ModbusGenericSensor(controller=controller, slave=slave, scan_interval=scan_interval, **sensor)
         for sensor in SENSORS
-    ])
+    ]
 
+    entities.append(ModbusUpdateIntervalSensor(controller=controller, slave=slave, scan_interval=scan_interval))
+
+    async_add_entities(entities)
 
 class ModbusGenericSensor(SensorEntity):
-    """Representation of a Sensor."""
+    """Representation of a standard sensor based on Modbus data."""
 
     def __init__(self, name, address, input_type="holding", scale=1.0, precision=0, unit=None, icon=None, controller=None, slave=1, scan_interval=30):
         self._attr_name = name
@@ -84,3 +87,33 @@ class ModbusGenericSensor(SensorEntity):
 
         except Exception as e:
             _LOGGER.exception(f"Error in ModbusGenericSensor update: {e}")
+
+class ModbusUpdateIntervalSensor(SensorEntity):
+    """Diagnostic sensor showing time between full Modbus updates."""
+
+    _attr_entity_category = "diagnostic"
+
+    def __init__(self, controller: ThesslaGreenModbusController, slave: int, scan_interval: int):
+        self._controller = controller
+        self._slave = slave
+        self._attr_name = "Modbus Update Interval"
+        self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
+        self._attr_native_value = None
+        self._attr_unique_id = f"thessla_update_interval_{slave}"
+        self._attr_icon = "mdi:clock-time-eight"
+        self._attr_scan_interval = timedelta(seconds=scan_interval)
+
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, f"{slave}")},
+            "name": "Rekuperator Thessla",
+            "manufacturer": "Thessla Green",
+            "model": "Modbus Rekuperator",
+        }
+
+    async def async_update(self):
+        try:
+            interval = await self._controller.get_last_update_interval()
+            if interval is not None:
+                self._attr_native_value = round(interval, 1)
+        except Exception as e:
+            _LOGGER.exception(f"Error reading update interval: {e}")

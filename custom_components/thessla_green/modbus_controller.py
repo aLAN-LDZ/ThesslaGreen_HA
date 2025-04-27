@@ -1,6 +1,7 @@
 from pymodbus.client import ModbusTcpClient
 import asyncio
 import logging
+import time
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,6 +22,9 @@ class ThesslaGreenModbusController:
         self._disabled = False
         self._connected = False
         self._log_suppressed = False
+
+        self._last_update_timestamp = None
+        self._last_update_interval = None
 
         self._holding_blocks = [
             (256, 2), (4192, 2), (4198, 1), (4208, 3), (4210, 1),
@@ -62,7 +66,6 @@ class ThesslaGreenModbusController:
             except Exception as e:
                 _LOGGER.debug("Modbus test read of register 4387 raised exception: %s", e)
 
-        # Połączenie nie działa – pełny reset klienta z opóźnieniem
         _LOGGER.warning("Modbus connection failed. Resetting Modbus client...")
         self._connected = False
         try:
@@ -70,7 +73,7 @@ class ThesslaGreenModbusController:
         except Exception as e:
             _LOGGER.debug("Exception while closing client: %s", e)
 
-        await asyncio.sleep(1)  # Daj czas na zamknięcie socketu
+        await asyncio.sleep(1)
         self._client = ModbusTcpClient(host=self._host, port=self._port)
         return False
 
@@ -113,6 +116,11 @@ class ThesslaGreenModbusController:
         async with self._lock:
             if not await self._ensure_connected():
                 raise ConnectionError(f"Could not connect to Modbus server at {self._host}:{self._port}")
+
+            now = time.time()
+            if self._last_update_timestamp is not None:
+                self._last_update_interval = now - self._last_update_timestamp
+            self._last_update_timestamp = now
 
             for start, count in self._holding_blocks:
                 rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
@@ -185,3 +193,8 @@ class ThesslaGreenModbusController:
             except Exception as e:
                 _LOGGER.exception("Exception during Modbus coil read: %s", e)
                 return None
+
+    async def get_last_update_interval(self) -> float | None:
+        """Return time in seconds between last two Modbus full updates."""
+        async with self._lock:
+            return self._last_update_interval
