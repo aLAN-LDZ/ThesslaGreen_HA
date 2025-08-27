@@ -24,7 +24,7 @@ class ThesslaGreenCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from Modbus."""
         try:
-            if not await self.controller._ensure_connected():
+            if not await self.controller.ensure_connected():
                 raise UpdateFailed("Not connected to Modbus controller.")
 
             return {
