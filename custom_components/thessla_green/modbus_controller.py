@@ -56,7 +56,7 @@ class ThesslaGreenModbusController:
 
         if connected:
             try:
-                test = self._client.read_holding_registers(address=4387, count=1, slave=self._slave)
+                test = self._client.read_holding_registers(address=4387, count=1, device_id=self._slave)
                 if test and not test.isError():
                     if not was_connected:
                         _LOGGER.warning("Modbus reconnected successfully.")
@@ -126,7 +126,7 @@ class ThesslaGreenModbusController:
 
             # Odczyt HOLDING
             for start, count in self._holding_blocks:
-                rr = self._client.read_holding_registers(address=start, count=count, slave=self._slave)
+                rr = self._client.read_holding_registers(address=start, count=count, device_id=self._slave)
                 if not rr.isError():
                     for i, val in enumerate(rr.registers):
                         self._data_holding[start + i] = val
@@ -135,7 +135,7 @@ class ThesslaGreenModbusController:
 
             # Odczyt INPUT
             for start, count in self._input_blocks:
-                rr = self._client.read_input_registers(address=start, count=count, slave=self._slave)
+                rr = self._client.read_input_registers(address=start, count=count, device_id=self._slave)
                 if not rr.isError():
                     for i, val in enumerate(rr.registers):
                         self._data_input[start + i] = val
@@ -144,7 +144,7 @@ class ThesslaGreenModbusController:
 
             # Odczyt COIL
             for start, count in self._coil_blocks:
-                rr = self._client.read_coils(address=start, count=count, slave=self._slave)
+                rr = self._client.read_coils(address=start, count=count, device_id=self._slave)
                 if not rr.isError():
                     for i, val in enumerate(rr.bits):
                         self._data_coil[start + i] = int(val)
@@ -180,7 +180,7 @@ class ThesslaGreenModbusController:
                 return False
             self._log_suppressed = False
             try:
-                rr = self._client.write_register(address=address, value=value, slave=self._slave)
+                rr = self._client.write_register(address=address, value=value, device_id=self._slave)
                 if rr.isError():
                     _LOGGER.error("Modbus write error at address %s with value %s", address, value)
                     return False
@@ -198,7 +198,7 @@ class ThesslaGreenModbusController:
                 return None
             self._log_suppressed = False
             try:
-                rr = self._client.read_coils(address=address, count=1, slave=self._slave)
+                rr = self._client.read_coils(address=address, count=1, device_id=self._slave)
                 if rr.isError():
                     _LOGGER.error("Modbus coil read error at address %s", address)
                     return None
