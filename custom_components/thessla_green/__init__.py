@@ -32,7 +32,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         slave_id=slave,
         update_interval=update_interval,
     )
-    await controller.start()
+
+    try:
+        controller.start()
+    except Exception as e:
+        _LOGGER.error("Failed to start Modbus controller: %s", e)
+        return False
 
     # Tworzenie koordynatora danych
     coordinator = ThesslaGreenCoordinator(
@@ -40,7 +45,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         controller=controller,
         scan_interval=update_interval,
     )
-    await coordinator.async_config_entry_first_refresh()
+
+    try:
+        await coordinator.async_config_entry_first_refresh()
+    except Exception as e:
+        _LOGGER.error("Failed to fetch initial data: %s", e)
+        return False
 
     # Zapisywanie instancji w hass.data
     hass.data[DOMAIN][entry.entry_id] = {
