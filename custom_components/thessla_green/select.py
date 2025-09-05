@@ -67,7 +67,7 @@ class RekuperatorTrybSelect(SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current selected option."""
-        value = self.coordinator.data["holding"].get(self._address)
+        value = self.coordinator.safe_data.holding.get(self._address)
         if value is None:
             return None
         return self._value_map.get(value)
@@ -121,7 +121,7 @@ class RekuperatorSezonSelect(SelectEntity):
     @property
     def current_option(self) -> str | None:
         """Return the current selected option."""
-        value = self.coordinator.data["holding"].get(self._address)
+        value = self.coordinator.safe_data.holding.get(self._address)
         if value is None:
             return None
         return self._value_map.get(value)

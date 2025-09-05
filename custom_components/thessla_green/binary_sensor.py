@@ -89,13 +89,10 @@ class ModbusBinarySensor(BinarySensorEntity):
     def is_on(self) -> bool | None:
         """Return true if the binary sensor is on."""
         if self._input_type == "coil":
-            value = self.coordinator.data["coil"].get(self._address)
-            if value is None:
-                return None
-            return bool(value)
+            return self.coordinator.safe_data.coil.get(self._address)
 
         elif self._input_type == "holding":
-            value = self.coordinator.data["holding"].get(self._address)
+            value = self.coordinator.safe_data.holding.get(self._address)
             if value is None:
                 return None
             return value == 1

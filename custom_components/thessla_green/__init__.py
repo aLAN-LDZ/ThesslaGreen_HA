@@ -33,12 +33,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update_interval=update_interval,
     )
 
-    try:
-        controller.start()
-    except Exception as e:
-        _LOGGER.error("Failed to start Modbus controller: %s", e)
-        return False
-
     # Tworzenie koordynatora danych
     coordinator = ThesslaGreenCoordinator(
         hass=hass,

@@ -54,10 +54,7 @@ class RekuperatorPredkoscNumber(NumberEntity):
     @property
     def native_value(self) -> float | None:
         """Return the current speed value."""
-        value = self.coordinator.data["holding"].get(self._address)
-        if value is None:
-            return None
-        return value
+        return self.coordinator.safe_data.holding.get(self._address)
 
     async def async_set_native_value(self, value: float) -> None:
         """Write speed value to the device."""
