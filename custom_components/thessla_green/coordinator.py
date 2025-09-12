@@ -23,8 +23,8 @@ class ThesslaGreenCoordinator(DataUpdateCoordinator[ControllerData]):
     async def _async_update_data(self):
         try:
             return await self.controller.fetch_data()
-        except Exception as err:
-            raise UpdateFailed(f"Error fetching Modbus data: {err}") from err
+        except Exception as error:
+            raise UpdateFailed(error)
 
     @property
     def safe_data(self) -> ControllerData:
