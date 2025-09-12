@@ -71,7 +71,7 @@ class ModbusSwitch(SwitchEntity):
     @property
     def is_on(self) -> bool | None:
         """Return true if the switch is on."""
-        value = self.coordinator.data["holding"].get(self._address)
+        value = self.coordinator.safe_data.holding.get(self._address)
         if value is None:
             return None
         return value == self._command_on

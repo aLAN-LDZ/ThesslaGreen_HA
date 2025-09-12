@@ -77,9 +77,9 @@ class ModbusGenericSensor(SensorEntity):
     @property
     def native_value(self):
         if self._input_type == "input":
-            raw_value = self.coordinator.data["input"].get(self._address)
+            raw_value = self.coordinator.safe_data.input.get(self._address)
         else:
-            raw_value = self.coordinator.data["holding"].get(self._address)
+            raw_value = self.coordinator.safe_data.holding.get(self._address)
 
         if raw_value is None:
             return None
@@ -124,7 +124,7 @@ class ModbusUpdateIntervalSensor(SensorEntity):
 
     @property
     def native_value(self):
-        return round(self.coordinator.controller._last_update_interval, 1) if self.coordinator.controller._last_update_interval else None
+        return self.coordinator.safe_data.update_interval
 
     async def async_update(self):
         # Niepotrzebne — wszystko przez coordinator

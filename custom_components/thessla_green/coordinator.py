@@ -4,33 +4,28 @@ from datetime import timedelta
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN
-from .modbus_controller import ThesslaGreenModbusController
+from .modbus_controller import ThesslaGreenModbusController, ControllerData
 
 _LOGGER = logging.getLogger(__name__)
 
-class ThesslaGreenCoordinator(DataUpdateCoordinator):
-    """Coordinator to manage data update for Thessla Green Modbus."""
+
+class ThesslaGreenCoordinator(DataUpdateCoordinator[ControllerData]):
 
     def __init__(self, hass, controller: ThesslaGreenModbusController, scan_interval: int):
-        """Initialize."""
         super().__init__(
-            hass,
-            _LOGGER,
+            hass=hass,
+            logger=_LOGGER,
             name=DOMAIN,
             update_interval=timedelta(seconds=scan_interval),
         )
         self.controller = controller
 
     async def _async_update_data(self):
-        """Fetch data from Modbus."""
         try:
-            if not await self.controller.ensure_connected():
-                raise UpdateFailed("Not connected to Modbus controller.")
+            return await self.controller.fetch_data()
+        except Exception as error:
+            raise UpdateFailed(error)
 
-            return {
-                "holding": self.controller._data_holding.copy(),
-                "input": self.controller._data_input.copy(),
-                "coil": self.controller._data_coil.copy(),
-            }
-        except Exception as err:
-            raise UpdateFailed(f"Error fetching Modbus data: {err}") from err
+    @property
+    def safe_data(self) -> ControllerData:
+        return self.data or ControllerData()
