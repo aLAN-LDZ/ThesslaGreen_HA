@@ -5,6 +5,7 @@ from homeassistant.const import UnitOfTemperature, UnitOfTime, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.event import async_track_state_change_event
 
 from . import DOMAIN
 from .modbus_controller import ThesslaGreenModbusController
@@ -44,8 +45,8 @@ async def async_setup_entry(
     # Dodaj sensor diagnostyczny
     entities.append(ModbusUpdateIntervalSensor(coordinator=coordinator, slave=slave))
 
-    # --- Metryki obliczane ---
-    power_entity = entry.options.get("sensor_power")  # sensor mocy (W lub kW) z OptionsFlow
+    # Metryki obliczane
+    power_entity = entry.options.get("sensor_power")  # W lub kW
     if not power_entity:
         _LOGGER.warning("Nie skonfigurowano 'sensor_power' w opcjach integracji – COP będzie 'unavailable'.")
 
@@ -177,7 +178,7 @@ class _BaseComputedSensor(SensorEntity):
         self._recalc()
         self.async_write_ha_state()
 
-    # Helpers odczytu (adresy na sztywno wg Twoich definicji):
+    # Helpers (adresy „na sztywno” wg Twoich definicji):
     def _read_temp_czerpnia(self) -> float | None:
         return self._read_input_scaled(addr=16, scale=0.1, precision=1)
 
@@ -211,7 +212,7 @@ class _BaseComputedSensor(SensorEntity):
 
 
 class RekuEfficiencySensor(_BaseComputedSensor):
-    """Sprawność odzysku [%] = ((T_nawiew - T_czerpnia) / (T_wywiew - T_czerpnia)) * 100"""
+    """Sprawność [%] = ((Tnawiew - Tczerpnia) / (Twywiew - Tczerpnia)) * 100"""
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int):
         super().__init__(coordinator, slave)
         self._attr_name = "Rekuperator – sprawność"
@@ -234,7 +235,7 @@ class RekuEfficiencySensor(_BaseComputedSensor):
 
 
 class RekuRecoveryPowerSensor(_BaseComputedSensor):
-    """Moc odzysku [kW] ≈ 0.000335 * przepływ[m3/h] * (T_nawiew - T_czerpnia)"""
+    """Moc odzysku [kW] ≈ 0.000335 * V[m3/h] * ΔT[°C]"""
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int):
         super().__init__(coordinator, slave)
         self._attr_name = "Rekuperator – moc odzysku"
@@ -257,7 +258,7 @@ class RekuCOPSensor(_BaseComputedSensor):
     """COP = (moc odzysku [kW]) / (pobór elektryczny [kW]) – bez jednostki"""
     @property
     def native_unit_of_measurement(self):
-        return None  # ratio (bezwymiarowy)
+        return None  # ratio
 
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int, power_entity: str | None):
         super().__init__(coordinator, slave)
@@ -265,15 +266,26 @@ class RekuCOPSensor(_BaseComputedSensor):
         self._attr_unique_id = f"thessla_cop_{slave}"
         self._attr_icon = "mdi:chart-line"
         self._power_entity = power_entity
+        self._last_power_val = None
+        self._last_power_unit = None
+
+    @property
+    def extra_state_attributes(self):
+        return {
+            "power_entity": self._power_entity,
+            "power_value_raw": self._last_power_val,
+            "power_unit": self._last_power_unit,
+        }
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        # nasłuch zmian sensora mocy w HA
+        # nasłuch zmian sensora mocy
         if self._power_entity:
             self.async_on_remove(
-                self.hass.helpers.event.async_track_state_change_event(
+                async_track_state_change_event(
+                    self.hass,
                     [self._power_entity],
-                    lambda ev: (self._recalc(), self.async_write_ha_state())
+                    lambda ev: (self._recalc(), self.async_write_ha_state()),
                 )
             )
 
@@ -284,14 +296,31 @@ class RekuCOPSensor(_BaseComputedSensor):
         st = self.hass.states.get(self._power_entity)
         if not st:
             return None
+
+        unit = (st.attributes.get("unit_of_measurement") or "").strip()
+        self._last_power_unit = unit
+
         try:
             val = float(st.state)
         except (TypeError, ValueError):
+            self._last_power_val = st.state
             return None
-        unit = (st.attributes.get("unit_of_measurement") or "").strip()
-        if unit.lower() in ("w", "watt"):
+
+        self._last_power_val = val
+        u = unit.lower()
+
+        if u in ("w", "watt"):
             return val / 1000.0
-        # traktuj wszystko inne jako kW (np. "kW" albo brak jednostki)
+        if u == "kw":
+            return val
+        if "kwh" in u:
+            _LOGGER.warning(
+                "Wybrany sensor '%s' podaje energię (%s), a nie moc. COP wymaga mocy chwilowej w W/kW.",
+                self._power_entity, unit
+            )
+            return None
+        # Brak/inna jednostka — traktuj jako kW (log diagnostyczny)
+        _LOGGER.debug("Sensor mocy '%s' ma jednostkę '%s' – przyjmuję jako kW.", self._power_entity, unit)
         return val
 
     def _recalc(self):
@@ -300,12 +329,9 @@ class RekuCOPSensor(_BaseComputedSensor):
         flow = self._read_flow_nawiew()
         p_kw = self._read_power_kw()
 
-        if None in (To, Ts, p_kw) or flow is None or flow <= 0 or p_kw is None or p_kw <= 0:
+        if None in (To, Ts) or flow is None or flow <= 0 or p_kw is None or p_kw <= 0:
             self._attr_native_value = None
             return
 
         q_kw = 0.000335 * flow * (Ts - To)
-        if q_kw > 0:
-            self._attr_native_value = round(q_kw / p_kw, 2)
-        else:
-            self._attr_native_value = None
+        self._attr_native_value = round(q_kw / p_kw, 2) if q_kw > 0 else None
