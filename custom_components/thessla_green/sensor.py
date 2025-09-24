@@ -215,7 +215,7 @@ class RekuEfficiencySensor(_BaseComputedSensor):
     """Sprawność [%] = ((Tnawiew - Tczerpnia) / (Twywiew - Tczerpnia)) * 100"""
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int):
         super().__init__(coordinator, slave)
-        self._attr_name = "Rekuperator – sprawność"
+        self._attr_name = "Rekuperator Sprawność"
         self._attr_unique_id = f"thessla_efficiency_{slave}"
         self._attr_icon = "mdi:percent"
         self._attr_native_unit_of_measurement = "%"
@@ -238,7 +238,7 @@ class RekuRecoveryPowerSensor(_BaseComputedSensor):
     """Moc odzysku [kW] ≈ 0.000335 * V[m3/h] * ΔT[°C]"""
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int):
         super().__init__(coordinator, slave)
-        self._attr_name = "Rekuperator – moc odzysku"
+        self._attr_name = "Rekuperator Moc Odzysku"
         self._attr_unique_id = f"thessla_recovery_power_{slave}"
         self._attr_icon = "mdi:fire"
         self._attr_native_unit_of_measurement = "kW"
@@ -256,15 +256,13 @@ class RekuRecoveryPowerSensor(_BaseComputedSensor):
 
 class RekuCOPSensor(_BaseComputedSensor):
     """COP = (moc odzysku [kW]) / (pobór elektryczny [kW]) – bez jednostki"""
-    @property
-    def native_unit_of_measurement(self):
-        return None  # ratio
 
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int, power_entity: str | None):
         super().__init__(coordinator, slave)
-        self._attr_name = "Rekuperator – COP odzysku"
+        self._attr_name = "Rekuperator COP"       
         self._attr_unique_id = f"thessla_cop_{slave}"
         self._attr_icon = "mdi:chart-line"
+        self._attr_native_unit_of_measurement = "x"       
         self._power_entity = power_entity
         self._last_power_val = None
         self._last_power_unit = None
