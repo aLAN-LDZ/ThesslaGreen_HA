@@ -1,0 +1,33 @@
+name: "Release"
+
+on:
+  release:
+    types:
+      - "published"
+
+permissions: {}
+
+jobs:
+  release:
+    name: "Release"
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: write
+
+    steps:
+      - name: "Checkout the repository"
+        uses: actions/checkout@v4
+
+      - name: "Create ZIP with integration"
+        shell: bash
+        run: |
+          mkdir -p dist
+          # Zbuduj zip z poprawną strukturą katalogów dla HACS:
+          zip -r "dist/thessla_green_${{ github.ref_name }}.zip" \
+            custom_components/thessla_green \
+            README.md LICENSE 2>/dev/null || true
+
+      - name: "Upload the ZIP file to the release"
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/thessla_green_${{ github.ref_name }}.zip

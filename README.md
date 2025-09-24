@@ -18,6 +18,7 @@
 - Konfiguracja przez interfejs użytkownika (UI Config Flow)
 - Integracja automatycznie grupuje wszystkie encje pod jedno urządzenie w Home Assistant
 - Wsparcie dla HACS (Home Assistant Community Store)
+- Po podaniu encji poboru energii możliwość wyliczenia COP, Moc Odzysku oraz Sprawność
 
 ---
 
@@ -60,6 +61,7 @@
 - Easy setup via Home Assistant UI (Config Flow)
 - All entities grouped into a single device in Home Assistant
 - Fully HACS-compatible (Home Assistant Community Store)
+- After entering the energy consumption entity, it is possible to calculate COP, Recovery Power and Efficiency
 
 ---
 
