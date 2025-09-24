@@ -1,11 +1,13 @@
 {
   "domain": "thessla_green",
   "name": "Thessla Green",
-  "config_flow": true,
   "codeowners": ["@aLAN-LDZ"],
+  "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/aLAN-LDZ/ThesslaGreen_HA",
+  "integration_type": "hub",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/aLAN-LDZ/ThesslaGreen_HA/issues",
   "requirements": ["pymodbus==3.11.1"],
   "version": "0.2.1"
 }
