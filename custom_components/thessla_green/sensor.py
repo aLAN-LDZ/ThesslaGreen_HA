@@ -259,10 +259,10 @@ class RekuCOPSensor(_BaseComputedSensor):
 
     def __init__(self, coordinator: ThesslaGreenCoordinator, slave: int, power_entity: str | None):
         super().__init__(coordinator, slave)
-        self._attr_name = "Rekuperator COP"       
+        self._attr_name = "Rekuperator COP"
         self._attr_unique_id = f"thessla_cop_{slave}"
         self._attr_icon = "mdi:chart-line"
-        self._attr_native_unit_of_measurement = "x"       
+        self._attr_native_unit_of_measurement = "x"
         self._power_entity = power_entity
         self._last_power_val = None
         self._last_power_unit = None
@@ -277,15 +277,19 @@ class RekuCOPSensor(_BaseComputedSensor):
 
     async def async_added_to_hass(self):
         await super().async_added_to_hass()
-        # nasłuch zmian sensora mocy
+        # nasłuch zmian sensora mocy - BEZPIECZNIE w event loop
         if self._power_entity:
-            self.async_on_remove(
-                async_track_state_change_event(
-                    self.hass,
-                    [self._power_entity],
-                    lambda ev: (self._recalc(), self.async_write_ha_state()),
-                )
+            @callback
+            def _on_power_change(event):
+                self._recalc()
+                self.async_write_ha_state()
+
+            unsub = async_track_state_change_event(
+                self.hass,
+                [self._power_entity],
+                _on_power_change,
             )
+            self.async_on_remove(unsub)
 
     def _read_power_kw(self) -> float | None:
         """Czyta sensor mocy z HA, zwraca w kW (auto-konwersja W→kW)."""
