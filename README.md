@@ -11,9 +11,6 @@
 [![License](https://img.shields.io/github/license/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](./LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/commits)
 
-<!-- Jeśli masz Discorda – podmień ID i link zaproszenia -->
-[![Discord](https://img.shields.io/discord/000000000000000000?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=7289da)](https://discord.gg/yourInviteCode)
-
 <!-- Jeśli używasz GitHub Actions – podmień nazwę pliku workflow i gałąź -->
 [![CI](https://img.shields.io/github/actions/workflow/status/aLAN-LDZ/ThesslaGreen_HA/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/actions)
 <!-- Badges: end -->
