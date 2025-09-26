@@ -1,3 +1,24 @@
+<!-- Badges: start -->
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5?style=for-the-badge&logo=homeassistantcommunitystore&logoColor=white)](https://hacs.xyz/)
+[![GitHub - Downloads](https://img.shields.io/github/downloads/aLAN-LDZ/ThesslaGreen_HA/total?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/releases)
+[![Issues & PRs](https://img.shields.io/github/issues-pr/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/issues)
+[![Latest Release](https://img.shields.io/github/v/release/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/releases)
+[![Release Date](https://img.shields.io/github/release-date/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge&label=Latest%20Release)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/releases)
+[![Pre-Release Date](https://img.shields.io/github/release-date-pre/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge&label=Latest%20Beta%20Release)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/releases)
+
+[![Stars](https://img.shields.io/github/stars/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/stargazers)
+[![Forks](https://img.shields.io/github/forks/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/network/members)
+[![License](https://img.shields.io/github/license/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](./LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/aLAN-LDZ/ThesslaGreen_HA?style=for-the-badge)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/commits)
+
+<!-- Jeśli masz Discorda – podmień ID i link zaproszenia -->
+[![Discord](https://img.shields.io/discord/000000000000000000?style=for-the-badge&logo=discord&logoColor=white&label=Discord&color=7289da)](https://discord.gg/yourInviteCode)
+
+<!-- Jeśli używasz GitHub Actions – podmień nazwę pliku workflow i gałąź -->
+[![CI](https://img.shields.io/github/actions/workflow/status/aLAN-LDZ/ThesslaGreen_HA/ci.yml?branch=main&style=for-the-badge&label=CI)](https://github.com/aLAN-LDZ/ThesslaGreen_HA/actions)
+<!-- Badges: end -->
+
+
 # ThesslaGreen_HA
 
 ## 🇵🇱 Integracja Home Assistant dla rekuperatorów Thessla Green z komunikacją Modbus TCP
