@@ -55,6 +55,33 @@ class ThesslaGreenModbusController:
             _LOGGER.info("Stopping Modbus controller for %s:%d", self._host, self._port)
             self._client.close()
 
+    async def _try_read_registers(self, func, start: int, count: int):
+        """Read one Modbus register block and return values or None on failure."""
+        try:
+            result = await func(
+                address=start,
+                count=count,
+                device_id=self._slave,
+            )
+        except Exception as e:
+            _LOGGER.debug(
+                "Read %d-%d raised an exception and will be skipped: %s",
+                start,
+                start + count - 1,
+                e,
+            )
+            return None
+
+        if result is None or result.isError():
+            _LOGGER.debug(
+                "Read %d-%d failed and will be skipped",
+                start,
+                start + count - 1,
+            )
+            return None
+
+        return result.registers
+
     async def fetch_data(self) -> ControllerData:
         async with self._controller_lock:
             await self._ensure_connected()
@@ -71,44 +98,91 @@ class ThesslaGreenModbusController:
 
             _LOGGER.debug("Reading all register blocks for slave %d", self._slave)
 
+            # Tolerate unsupported or temporarily failing blocks. Different
+            # AirPack variants/firmware revisions may expose slightly different
+            # register ranges, so one failed block should not invalidate the
+            # complete update if the rest of the unit is still reachable.
+            read_ok = 0
+
             # Read holding registers
             for start, count in self._holding_blocks:
-                try:
-                    result = await self._client.read_holding_registers(address=start, count=count,
-                                                                       device_id=self._slave)
-                    if result.isError():
-                        raise ControllerException(f"Error reading holding registers {start}-{start + count - 1}")
-                    for i, val in enumerate(result.registers):
-                        data_holding[start + i] = val
-                    _LOGGER.debug("Holding registers %d-%d read: %s", start, start + count - 1, result.registers)
-                except Exception as e:
-                    raise ControllerException(
-                        f"Exception reading holding registers {start}-{start + count - 1}: {e}") from e
+                registers = await self._try_read_registers(
+                    self._client.read_holding_registers,
+                    start,
+                    count,
+                )
+                if registers is None:
+                    continue
+
+                for i, val in enumerate(registers):
+                    data_holding[start + i] = val
+                read_ok += len(registers)
+                _LOGGER.debug(
+                    "Holding registers %d-%d read: %s",
+                    start,
+                    start + count - 1,
+                    registers,
+                )
 
             # Read input registers
             for start, count in self._input_blocks:
-                try:
-                    result = await self._client.read_input_registers(address=start, count=count, device_id=self._slave)
-                    if result.isError():
-                        raise ControllerException(f"Error reading input registers {start}-{start + count - 1}")
-                    for i, val in enumerate(result.registers):
-                        data_input[start + i] = val
-                    _LOGGER.debug("Input registers %d-%d read: %s", start, start + count - 1, result.registers)
-                except Exception as e:
-                    raise ControllerException(
-                        f"Exception reading input registers {start}-{start + count - 1}: {e}") from e
+                registers = await self._try_read_registers(
+                    self._client.read_input_registers,
+                    start,
+                    count,
+                )
+                if registers is None:
+                    continue
+
+                for i, val in enumerate(registers):
+                    data_input[start + i] = val
+                read_ok += len(registers)
+                _LOGGER.debug(
+                    "Input registers %d-%d read: %s",
+                    start,
+                    start + count - 1,
+                    registers,
+                )
 
             # Read coils
             for start, count in self._coil_blocks:
                 try:
-                    result = await self._client.read_coils(address=start, count=count, device_id=self._slave)
-                    if result.isError():
-                        raise ControllerException(f"Error reading coils {start}-{start + count - 1}")
-                    for i, val in enumerate(result.bits):
-                        data_coil[start + i] = bool(val)
-                    _LOGGER.debug("Coils %d-%d read: %s", start, start + count - 1, result.bits)
+                    result = await self._client.read_coils(
+                        address=start,
+                        count=count,
+                        device_id=self._slave,
+                    )
                 except Exception as e:
-                    raise ControllerException(f"Exception reading coils {start}-{start + count - 1}: {e}") from e
+                    _LOGGER.debug(
+                        "Coils %d-%d raised an exception and will be skipped: %s",
+                        start,
+                        start + count - 1,
+                        e,
+                    )
+                    continue
+
+                if result is None or result.isError():
+                    _LOGGER.debug(
+                        "Coils %d-%d failed and will be skipped",
+                        start,
+                        start + count - 1,
+                    )
+                    continue
+
+                for i, val in enumerate(result.bits[:count]):
+                    data_coil[start + i] = bool(val)
+                read_ok += count
+                _LOGGER.debug(
+                    "Coils %d-%d read: %s",
+                    start,
+                    start + count - 1,
+                    result.bits[:count],
+                )
+
+            if read_ok == 0:
+                raise ControllerException(
+                    "No Modbus data could be read; device may be unreachable"
+                )
 
             return ControllerData(
                 holding=data_holding,
