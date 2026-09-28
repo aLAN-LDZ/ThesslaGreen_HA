@@ -30,4 +30,4 @@ class ThesslaGreenConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry):
         """Link to options flow handler."""
         from .options_flow import ThesslaGreenOptionsFlowHandler
-        return ThesslaGreenOptionsFlowHandler(config_entry)
+        return ThesslaGreenOptionsFlowHandler()

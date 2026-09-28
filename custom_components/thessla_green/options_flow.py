@@ -10,10 +10,11 @@ DISPLAY_KEY = "Sensor poboru mocy (W lub kW)"
 ACCEPTED_UNITS = {"W", "kW", "watt", "Watt", "KW"}  # dopuszczalne warianty
 
 class ThesslaGreenOptionsFlowHandler(config_entries.OptionsFlow):
-    """Options flow for Thessla Green integration."""
+    """Options flow for Thessla Green integration.
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+    Home Assistant provides self.config_entry for OptionsFlow instances.
+    Do not assign it manually because it is a read-only property on current HA.
+    """
 
     async def async_step_init(self, user_input=None):
         hass: HomeAssistant = self.hass
@@ -40,13 +41,14 @@ class ThesslaGreenOptionsFlowHandler(config_entries.OptionsFlow):
 
         # domyślna wartość do formularza (jeśli wcześniej zapisano)
         default_entity = self.config_entry.options.get("sensor_power")
+        key_default = default_entity if default_entity else vol.UNDEFINED
 
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
                 vol.Optional(
                     DISPLAY_KEY,
-                    default=default_entity
+                    default=key_default
                 ): selector({
                     "entity": {
                         "domain": "sensor",
